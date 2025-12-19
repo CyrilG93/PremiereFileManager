@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/compact.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <svg class="logo" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M12 11v6M9 14h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round" />
+                </svg>
+                <h1>File Manager</h1>
+            </div>
+            <button class="settings-btn" id="settingsBtn" title="Paramètres">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" />
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </button>
+        </header>
+
+        <main>
+            <div class="project-info" id="projectInfo">
+                <div class="info-item">
+                    <span class="info-label" data-i18n="labels.project">Projet:</span>
+                    <span class="info-value" id="projectName">-</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label" data-i18n="labels.rootFolder">Dossier racine:</span>
+                    <span class="info-value" id="projectRoot">-</span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-section">
+                <button class="analyze-btn" id="analyzeBtn">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                    <span data-i18n="buttons.analyze">Analyser</span>
+                </button>
+            </div>
+
+            <!-- Compact Mode (shown when window is small) -->
+            <div class="compact-mode" id="compactMode">
+                <div class="compact-buttons">
+                    <button class="compact-btn import-compact-btn" id="compactImportBtn">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span data-i18n="compact.import">Importer</span>
+                    </button>
+                    <button class="compact-btn export-compact-btn" id="compactExportBtn">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span data-i18n="compact.export">Exporter</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Debug Section -->
+            <div id="debugSection" class="section hidden" style="margin-top: 16px;">
+                <div class="section-header"
+                    style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
+                    onclick="toggleDebugSection()">
+                    <h2 style="margin: 0; font-size: 14px;">🔍 Debug Info</h2>
+                    <span id="debugToggleIcon" style="font-size: 12px; transition: transform 0.2s;">▼</span>
+                </div>
+                <div id="debugContent" class="section-content"
+                    style="padding: 12px; background: var(--bg-secondary); border-radius: 0 0 8px 8px; display: none;">
+                    <div
+                        style="font-family: 'Courier New', monospace; font-size: 11px; white-space: pre-wrap; background: var(--bg-tertiary); padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto; color: var(--text-primary);">
+                        <!-- Debug info will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dual Results Section -->
+            <div id="resultsSection" class="section">
+                <div class="dual-results">
+                    <!-- Import Column (Left) -->
+                    <div class="result-column import-column">
+                        <div class="column-header">
+                            <h3 data-i18n="results.importTitle">📥 Fichiers à Importer</h3>
+                            <p class="column-subtitle" data-i18n="results.importSubtitle">Du dossier → Premiere Pro</p>
+                            <div class="select-controls">
+                                <button id="selectAllImportBtn" class="secondary-btn"
+                                    data-i18n="buttons.selectAllImport">Tout</button>
+                                <button id="deselectAllImportBtn" class="secondary-btn"
+                                    data-i18n="buttons.deselectAllImport">Aucun</button>
+                            </div>
+                        </div>
+                        <div id="importFilesList" class="files-list"></div>
+                        <button id="importBtn" class="action-btn import-action-btn">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                            <span data-i18n="results.importButton">Importer</span> (<span id="importCount">0</span>)
+                        </button>
+                    </div>
+
+                    <!-- Export Column (Right) -->
+                    <div class="result-column export-column">
+                        <div class="column-header">
+                            <h3 data-i18n="results.exportTitle">📤 Fichiers à Exporter</h3>
+                            <p class="column-subtitle" data-i18n="results.exportSubtitle">De Premiere Pro → dossier</p>
+                            <div class="select-controls">
+                                <button id="selectAllExportBtn" class="secondary-btn"
+                                    data-i18n="buttons.selectAllExport">Tout</button>
+                                <button id="deselectAllExportBtn" class="secondary-btn"
+                                    data-i18n="buttons.deselectAllExport">Aucun</button>
+                            </div>
+                        </div>
+                        <div id="exportFilesList" class="files-list"></div>
+                        <button id="exportBtn" class="action-btn export-action-btn">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                            <span data-i18n="results.exportButton">Exporter</span> (<span id="exportCount">0</span>)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sync-controls" id="syncControls">
+                <button class="sync-btn" id="syncBtn">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span>Synchroniser</span>
+                </button>
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-info">
+                    <span id="progressText">Synchronisation en cours...</span>
+                    <span id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <div class="status-message" id="statusMessage"></div>
+            <!-- Export Report Section -->
+            <div id="reportSection" class="report-section">
+                <h3 data-i18n="report.title">Rapport d'Export</h3>
+                <div id="reportList" class="report-list"></div>
+            </div>
+        </main>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settingsPanel">
+            <div class="settings-header">
+                <h2 data-i18n="settings.title">Paramètres</h2>
+                <button class="close-btn" id="closeSettingsBtn">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                    </svg>
+                </button>
+            </div>
+            <div class="settings-content">
+                <!-- Language Selector -->
+                <div class="setting-item">
+                    <label for="languageSelect" data-i18n="settings.language">Langue</label>
+                    <select id="languageSelect" class="language-select">
+                        <option value="en">🇬🇧 English</option>
+                        <option value="fr">🇫🇷 Français</option>
+                    </select>
+                </div>
+
+                <div class="setting-item">
+                    <label for="rootFolder" data-i18n="settings.rootFolder">Dossier racine du projet</label>
+                    <div class="folder-input-group">
+                        <input type="text" id="rootFolder" data-i18n-placeholder="settings.rootFolderPlaceholder"
+                            placeholder="Détection automatique" />
+                        <button class="browse-btn" id="browseRootBtn">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="setting-item">
+                    <label for="rootFolderLevels" data-i18n="settings.rootFolderLevels">Niveaux parents depuis le
+                        fichier projet</label>
+                    <input type="number" id="rootFolderLevels" value="0" min="0" max="5" />
+                    <p class="setting-description" data-i18n="settings.rootFolderLevelsHelp">Combien de niveaux remonter
+                        depuis le dossier du fichier projet (0 = même dossier, 1 = parent, 2 = grand-parent)</p>
+                </div>
+
+                <div class="setting-item">
+                    <label for="excludedFolderNames" data-i18n="settings.excludedFolderNames">Noms de dossiers à ignorer
+                        à l'import</label>
+                    <textarea id="excludedFolderNames" rows="2"
+                        data-i18n-placeholder="settings.excludedFolderNamesPlaceholder"
+                        placeholder="Ex: node_modules, .git, Thumbs.db"></textarea>
+                </div>
+                <div class="setting-item">
+                    <label for="bannedExtensions" data-i18n="settings.bannedExtensions">Extensions de fichiers bannies à
+                        l'import</label>
+                    <textarea id="bannedExtensions" rows="3"
+                        data-i18n-placeholder="settings.bannedExtensionsPlaceholder"
+                        placeholder="Ex: .zip, .pptx, .exe&#10;Une extension par ligne"></textarea>
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="autoImport" />
+                        <span data-i18n="settings.autoImport">Import automatique</span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label for="autoImportInterval" data-i18n="settings.autoImportInterval">Intervalle d'import auto
+                        (secondes)</label>
+                    <input type="number" id="autoImportInterval" value="30" min="10" max="300" />
+                </div>
+                <div class="setting-item">
+                    <label>
+                        <input type="checkbox" id="autoRelink" checked />
+                        <span data-i18n="settings.autoRelink">Relier automatiquement les médias après l'export</span>
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label for="excludedFolders" data-i18n="settings.excludedFolders">Dossiers exclus de
+                        l'export</label>
+                    <textarea id="excludedFolders" rows="3" data-i18n-placeholder="settings.excludedFoldersPlaceholder"
+                        placeholder="Ex: TEMP, CACHE, BACKUP&#10;Un dossier par ligne"></textarea>
+                </div>
+
+                <button class="save-settings-btn" id="saveSettingsBtn" data-i18n="buttons.save">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug Logs Section -->
+    <div id="debugSection" class="section">
+        <div class="section-header">
+            <h3>🐛 Logs de Debug</h3>
+            <button id="clearLogsBtn" class="secondary-btn">Effacer</button>
+        </div>
+        <div id="debugLogs" class="debug-logs"></div>
+    </div>
+
+    <script src="js/CSInterface.js"></script>
+    <script src="js/fileOperations.js"></script>
+    <script src="js/main.js"></script>
+</body>
+
+</html>

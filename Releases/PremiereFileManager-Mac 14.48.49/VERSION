@@ -1,0 +1,22 @@
+File Manager Extension v1.0.0
+Compatible avec Adobe Premiere Pro 2025 (25.5+)
+
+FONCTIONNALITÉS :
+- Analyse des fichiers du projet
+- Détection des fichiers externes
+- Synchronisation automatique
+- Préservation de la structure des dossiers
+- Liaison automatique des médias
+- Compatible Mac et Windows
+
+INSTALLATION :
+Voir README_INSTALLATION.md pour les instructions complètes
+
+UTILISATION :
+1. Ouvrir l'extension : Fenêtre > Extensions > File Manager
+2. Analyser le projet
+3. Sélectionner les fichiers à synchroniser
+4. Cliquer sur Synchroniser
+
+SUPPORT :
+Pour toute question, consultez le README_INSTALLATION.md

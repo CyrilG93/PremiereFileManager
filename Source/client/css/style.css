@@ -94,6 +94,48 @@ h1 {
     height: 20px;
 }
 
+/* Header Actions */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.header-toggle-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.header-toggle-btn:hover {
+    background: var(--bg-secondary);
+}
+
+.header-toggle-btn.active {
+    background: #22c55e;
+    color: white;
+    border-color: #22c55e;
+}
+
+.header-toggle-btn.active:hover {
+    background: #16a34a;
+    border-color: #16a34a;
+}
+
 /* Main Content */
 main {
     flex: 1;

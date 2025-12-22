@@ -1491,21 +1491,27 @@ function updateAutoImportButtons() {
     const mainToggle = document.getElementById('autoImportToggle');
     const compactToggle = document.getElementById('compactAutoToggle');
 
+    // Update header button
     if (mainToggle) {
+        const spanElement = mainToggle.querySelector('span');
         if (settings.autoImport) {
             mainToggle.classList.add('active');
-            mainToggle.querySelector('span').textContent = 'Auto: ON';
+            if (spanElement) spanElement.textContent = 'Auto: ON';
         } else {
             mainToggle.classList.remove('active');
-            mainToggle.querySelector('span').textContent = 'Auto: OFF';
+            if (spanElement) spanElement.textContent = 'Auto: OFF';
         }
     }
 
+    // Update compact button
     if (compactToggle) {
+        const spanElement = compactToggle.querySelector('span');
         if (settings.autoImport) {
             compactToggle.classList.add('active');
+            if (spanElement) spanElement.textContent = 'Auto: ON';
         } else {
             compactToggle.classList.remove('active');
+            if (spanElement) spanElement.textContent = 'Auto: OFF';
         }
     }
 }

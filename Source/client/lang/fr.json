@@ -4,7 +4,7 @@
         "language": "Langue",
         "rootFolder": "Dossier racine",
         "selectFolder": "Sélectionner un dossier",
-        "autoRelink": "Relier automatiquement après export",
+        "autoRelink": "Relier automatiquement après consolidation",
         "autoImport": "Import automatique",
         "autoImportInterval": "Intervalle d'import auto (secondes)",
         "excludedFolders": "Dossiers exclus",
@@ -13,7 +13,7 @@
     "buttons": {
         "analyze": "Analyser",
         "import": "Importer",
-        "export": "Exporter",
+        "export": "Consolider",
         "selectAll": "Tout sélectionner",
         "deselectAll": "Tout désélectionner",
         "clearLogs": "Effacer les logs",
@@ -22,31 +22,31 @@
     },
     "compact": {
         "import": "Importer",
-        "export": "Exporter"
+        "export": "Consolider"
     },
     "status": {
         "analyzing": "Analyse du projet...",
         "searching": "Recherche de nouveaux fichiers...",
         "importing": "Import des fichiers...",
-        "exporting": "Export des fichiers...",
+        "exporting": "Consolidation des fichiers...",
         "relinking": "Liaison des médias...",
         "completed": "Opération terminée",
         "noNewFiles": "Aucun nouveau fichier à importer",
-        "allSynced": "Tous les fichiers sont synchronisés",
+        "allSynced": "Tous les fichiers sont consolidés",
         "filesDetected": "fichier(s) détecté(s)",
         "filesImported": "fichier(s) importé(s) avec succès",
-        "filesExported": "fichier(s) exporté(s) avec succès",
+        "filesExported": "fichier(s) consolidé(s) avec succès",
         "autoImportStarted": "Import automatique démarré avec intervalle",
         "autoImportStopped": "Import automatique arrêté"
     },
     "results": {
         "importTitle": "Fichiers à Importer",
-        "exportTitle": "Fichiers à Exporter",
+        "exportTitle": "Fichiers à Consolider",
         "emptyImport": "Aucun nouveau fichier à importer",
-        "emptyExport": "Tous les fichiers sont synchronisés"
+        "emptyExport": "Tous les fichiers sont consolidés"
     },
     "report": {
-        "title": "Rapport d'Export",
+        "title": "Rapport de Consolidation",
         "success": "Succès",
         "skipped": "Ignoré (existe déjà)",
         "failed": "Échec"
@@ -55,7 +55,7 @@
         "noRootFolder": "Veuillez d'abord sélectionner un dossier racine",
         "scanError": "Erreur lors du scan",
         "importError": "Erreur lors de l'import",
-        "exportError": "Erreur lors de l'export",
+        "exportError": "Erreur lors de la consolidation",
         "invalidFormat": "Format de réponse invalide"
     },
     "labels": {

@@ -4,7 +4,7 @@
     "language": "Language",
     "rootFolder": "Root Folder",
     "selectFolder": "Select Folder",
-    "autoRelink": "Auto-relink after export",
+    "autoRelink": "Auto-relink after consolidation",
     "autoImport": "Auto-import",
     "autoImportInterval": "Auto-import interval (seconds)",
     "excludedFolders": "Excluded Folders",
@@ -13,7 +13,7 @@
   "buttons": {
     "analyze": "Analyze",
     "import": "Import",
-    "export": "Export",
+    "export": "Consolidate",
     "selectAll": "Select All",
     "deselectAll": "Deselect All",
     "clearLogs": "Clear Logs",
@@ -22,31 +22,31 @@
   },
   "compact": {
     "import": "Import",
-    "export": "Export"
+    "export": "Consolidate"
   },
   "status": {
     "analyzing": "Analyzing project...",
     "searching": "Searching for new files...",
     "importing": "Importing files...",
-    "exporting": "Exporting files...",
+    "exporting": "Consolidating files...",
     "relinking": "Relinking media...",
     "completed": "Operation completed",
     "noNewFiles": "No new files to import",
-    "allSynced": "All files are synchronized",
+    "allSynced": "All files are consolidated",
     "filesDetected": "file(s) detected",
     "filesImported": "file(s) imported successfully",
-    "filesExported": "file(s) exported successfully",
+    "filesExported": "file(s) consolidated successfully",
     "autoImportStarted": "Auto-import started with interval",
     "autoImportStopped": "Auto-import stopped"
   },
   "results": {
     "importTitle": "Files to Import",
-    "exportTitle": "Files to Export",
+    "exportTitle": "Files to Consolidate",
     "emptyImport": "No new files to import",
-    "emptyExport": "All files are synchronized"
+    "emptyExport": "All files are consolidated"
   },
   "report": {
-    "title": "Export Report",
+    "title": "Consolidation Report",
     "success": "Success",
     "skipped": "Skipped (already exists)",
     "failed": "Failed"
@@ -55,7 +55,7 @@
     "noRootFolder": "Please select a root folder first",
     "scanError": "Error during scan",
     "importError": "Error during import",
-    "exportError": "Error during export",
+    "exportError": "Error during consolidation",
     "invalidFormat": "Invalid response format"
   },
   "labels": {

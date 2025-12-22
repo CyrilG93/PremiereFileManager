@@ -24,15 +24,28 @@
                 </svg>
                 <h1>File Manager</h1>
             </div>
-            <button class="settings-btn" id="settingsBtn" title="Paramètres">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round" />
-                    <path
-                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"
-                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-            </button>
+            <div class="header-actions">
+                <!-- Auto-Import Toggle in Header -->
+                <button class="header-toggle-btn" id="autoImportToggle" onclick="toggleAutoImport()"
+                    title="Auto-Import">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <span>Auto: OFF</span>
+                </button>
+                <button class="settings-btn" id="settingsBtn" title="Paramètres">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round" />
+                        <path
+                            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1Z"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+            </div>
         </header>
 
         <main>
@@ -58,22 +71,21 @@
                     </svg>
                     <span data-i18n="buttons.analyze">Analyser</span>
                 </button>
-
-                <!-- Auto-Import Toggle -->
-                <button class="auto-toggle-btn" id="autoImportToggle" onclick="toggleAutoImport()">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round" />
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                    </svg>
-                    <span data-i18n="buttons.autoOff">Auto: OFF</span>
-                </button>
             </div>
 
             <!-- Compact Mode (shown when window is small) -->
             <div class="compact-mode" id="compactMode">
                 <div class="compact-buttons">
+                    <!-- Auto-Import Toggle (first, on the left) -->
+                    <button class="compact-btn auto-compact-btn" id="compactAutoToggle" onclick="toggleAutoImport()">
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round" />
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <span>Auto</span>
+                    </button>
                     <button class="compact-btn import-compact-btn" id="compactImportBtn">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"
@@ -86,17 +98,7 @@
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"
                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
                         </svg>
-                        <span data-i18n="compact.export">Exporter</span>
-                    </button>
-                    <!-- Compact Auto-Import Toggle -->
-                    <button class="compact-btn auto-compact-btn" id="compactAutoToggle" onclick="toggleAutoImport()">
-                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M23 4v6h-6M1 20v-6h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round" />
-                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
-                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                        <span>Auto</span>
+                        <span data-i18n="compact.export">Consolider</span>
                     </button>
                 </div>
             </div>
@@ -144,10 +146,10 @@
                         </button>
                     </div>
 
-                    <!-- Export Column (Right) -->
+                    <!-- Consolidate Column (Right) -->
                     <div class="result-column export-column">
                         <div class="column-header">
-                            <h3 data-i18n="results.exportTitle">📤 Fichiers à Exporter</h3>
+                            <h3 data-i18n="results.exportTitle">📤 Fichiers à Consolider</h3>
                             <p class="column-subtitle" data-i18n="results.exportSubtitle">De Premiere Pro → dossier</p>
                             <div class="select-controls">
                                 <button id="selectAllExportBtn" class="secondary-btn"
@@ -163,7 +165,7 @@
                                     stroke="currentColor" stroke-width="2" stroke-linecap="round"
                                     stroke-linejoin="round" />
                             </svg>
-                            <span data-i18n="results.exportButton">Exporter</span> (<span id="exportCount">0</span>)
+                            <span data-i18n="results.exportButton">Consolider</span> (<span id="exportCount">0</span>)
                         </button>
                     </div>
                 </div>
@@ -190,9 +192,9 @@
             </div>
 
             <div class="status-message" id="statusMessage"></div>
-            <!-- Export Report Section -->
+            <!-- Consolidation Report Section -->
             <div id="reportSection" class="report-section">
-                <h3 data-i18n="report.title">Rapport d'Export</h3>
+                <h3 data-i18n="report.title">Rapport de Consolidation</h3>
                 <div id="reportList" class="report-list"></div>
             </div>
         </main>
@@ -269,12 +271,13 @@
                 <div class="setting-item">
                     <label>
                         <input type="checkbox" id="autoRelink" checked />
-                        <span data-i18n="settings.autoRelink">Relier automatiquement les médias après l'export</span>
+                        <span data-i18n="settings.autoRelink">Relier automatiquement les médias après la
+                            consolidation</span>
                     </label>
                 </div>
                 <div class="setting-item">
                     <label for="excludedFolders" data-i18n="settings.excludedFolders">Dossiers exclus de
-                        l'export</label>
+                        la consolidation</label>
                     <textarea id="excludedFolders" rows="3" data-i18n-placeholder="settings.excludedFoldersPlaceholder"
                         placeholder="Ex: TEMP, CACHE, BACKUP&#10;Un dossier par ligne"></textarea>
                 </div>

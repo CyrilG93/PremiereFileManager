@@ -12,7 +12,7 @@
 
 .compact-buttons {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 12px;
 }
 
@@ -75,8 +75,8 @@
 @media (max-width: 600px),
 (max-height: 400px) {
 
-    /* Hide all normal UI elements */
-    .header,
+    /* Hide UI elements including header in compact mode */
+    header,
     .settings-section,
     .controls,
     .project-info,
@@ -95,6 +95,32 @@
     /* Show compact mode */
     .compact-mode {
         display: flex !important;
+    }
+
+    /* Style for auto button in compact mode - icon only */
+    .auto-compact-btn {
+        background: var(--bg-tertiary) !important;
+        border: 1px solid var(--border-color) !important;
+        color: var(--text-secondary) !important;
+    }
+
+    .auto-compact-btn span {
+        display: none !important;
+    }
+
+    .auto-compact-btn svg {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    .auto-compact-btn.active {
+        background: #22c55e !important;
+        color: white !important;
+        border-color: #22c55e !important;
+    }
+
+    .auto-compact-btn.active:hover {
+        background: #16a34a !important;
     }
 
     /* Adapt to very small heights */

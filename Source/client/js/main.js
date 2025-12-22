@@ -1579,7 +1579,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (langSelect) langSelect.value = newLang;
         if (headerLangSelect) headerLangSelect.value = newLang;
 
-        applyTranslations();
+        updateUILanguage();
     }
 
     // Instant language change from settings

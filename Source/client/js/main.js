@@ -1460,6 +1460,56 @@ function stopAutoImport() {
     }
 }
 
+// Toggle auto-import from main UI
+function toggleAutoImport() {
+    settings.autoImport = !settings.autoImport;
+
+    // Update the toggle buttons
+    updateAutoImportButtons();
+
+    // Start or stop auto-import immediately
+    if (settings.autoImport) {
+        startAutoImport();
+        showStatus('Auto-import activé', 'success');
+    } else {
+        stopAutoImport();
+        showStatus('Auto-import désactivé', 'info');
+    }
+
+    // Update the checkbox in settings
+    const autoImportCheckbox = document.getElementById('autoImport');
+    if (autoImportCheckbox) {
+        autoImportCheckbox.checked = settings.autoImport;
+    }
+
+    // Save settings
+    localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
+}
+
+// Update auto-import toggle button states
+function updateAutoImportButtons() {
+    const mainToggle = document.getElementById('autoImportToggle');
+    const compactToggle = document.getElementById('compactAutoToggle');
+
+    if (mainToggle) {
+        if (settings.autoImport) {
+            mainToggle.classList.add('active');
+            mainToggle.querySelector('span').textContent = 'Auto: ON';
+        } else {
+            mainToggle.classList.remove('active');
+            mainToggle.querySelector('span').textContent = 'Auto: OFF';
+        }
+    }
+
+    if (compactToggle) {
+        if (settings.autoImport) {
+            compactToggle.classList.add('active');
+        } else {
+            compactToggle.classList.remove('active');
+        }
+    }
+}
+
 // Toggle debug section visibility
 function toggleDebugSection() {
     const debugContent = document.getElementById('debugContent');
@@ -1504,6 +1554,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Debug
     document.getElementById('clearLogsBtn').addEventListener('click', clearDebugLogs);
+
+    // Initialize auto-import toggle buttons state
+    updateAutoImportButtons();
 
     // Initialize auto-import if enabled
     if (settings.autoImport) {

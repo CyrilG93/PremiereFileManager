@@ -1,0 +1,67 @@
+{
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "rootFolder": "Root Folder",
+    "selectFolder": "Select Folder",
+    "autoRelink": "Auto-relink after export",
+    "autoImport": "Auto-import",
+    "autoImportInterval": "Auto-import interval (seconds)",
+    "excludedFolders": "Excluded Folders",
+    "bannedExtensions": "Banned Extensions"
+  },
+  "buttons": {
+    "analyze": "Analyze",
+    "import": "Import",
+    "export": "Export",
+    "selectAll": "Select All",
+    "deselectAll": "Deselect All",
+    "clearLogs": "Clear Logs",
+    "autoOn": "Auto: ON",
+    "autoOff": "Auto: OFF"
+  },
+  "compact": {
+    "import": "Import",
+    "export": "Export"
+  },
+  "status": {
+    "analyzing": "Analyzing project...",
+    "searching": "Searching for new files...",
+    "importing": "Importing files...",
+    "exporting": "Exporting files...",
+    "relinking": "Relinking media...",
+    "completed": "Operation completed",
+    "noNewFiles": "No new files to import",
+    "allSynced": "All files are synchronized",
+    "filesDetected": "file(s) detected",
+    "filesImported": "file(s) imported successfully",
+    "filesExported": "file(s) exported successfully",
+    "autoImportStarted": "Auto-import started with interval",
+    "autoImportStopped": "Auto-import stopped"
+  },
+  "results": {
+    "importTitle": "Files to Import",
+    "exportTitle": "Files to Export",
+    "emptyImport": "No new files to import",
+    "emptyExport": "All files are synchronized"
+  },
+  "report": {
+    "title": "Export Report",
+    "success": "Success",
+    "skipped": "Skipped (already exists)",
+    "failed": "Failed"
+  },
+  "errors": {
+    "noRootFolder": "Please select a root folder first",
+    "scanError": "Error during scan",
+    "importError": "Error during import",
+    "exportError": "Error during export",
+    "invalidFormat": "Invalid response format"
+  },
+  "labels": {
+    "current": "Current",
+    "target": "Target",
+    "bin": "Bin",
+    "offline": "offline"
+  }
+}

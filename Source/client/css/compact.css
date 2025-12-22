@@ -1,0 +1,170 @@
+/* Compact Mode Styles */
+.compact-mode {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.compact-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.compact-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 0;
+    /* Allow buttons to shrink */
+}
+
+.compact-btn svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.compact-btn span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.import-compact-btn {
+    background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+    color: white;
+}
+
+.import-compact-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+}
+
+.export-compact-btn {
+    background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+    color: white;
+}
+
+.export-compact-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #388e3c 0%, #2c6b2f 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.compact-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Media query for compact mode */
+@media (max-width: 600px),
+(max-height: 400px) {
+
+    /* Hide all normal UI elements */
+    .header,
+    .settings-section,
+    .controls,
+    .project-info,
+    .action-section,
+    #resultsSection,
+    #reportSection,
+    #debugSection,
+    .sync-controls,
+    #syncControls,
+    .progress-container,
+    .status-message,
+    .debug-logs {
+        display: none !important;
+    }
+
+    /* Show compact mode */
+    .compact-mode {
+        display: flex !important;
+    }
+
+    /* Adapt to very small heights */
+    @media (max-height: 300px) {
+        .compact-mode {
+            padding: 10px;
+        }
+
+        .compact-btn {
+            padding: 12px;
+            font-size: 12px;
+            min-height: 70px;
+        }
+
+        .compact-btn i {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+    }
+
+    @media (max-height: 200px) {
+        .compact-mode {
+            padding: 5px;
+        }
+
+        .compact-btn {
+            padding: 8px;
+            font-size: 11px;
+            min-height: 50px;
+        }
+
+        .compact-btn i {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+    }
+}
+
+/* Extra small height adjustments */
+@media (max-height: 300px) {
+    .compact-mode {
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .compact-btn {
+        padding: 12px 8px;
+        font-size: 14px;
+    }
+
+    .compact-btn svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* Very small height - minimal mode */
+@media (max-height: 200px) {
+    .compact-mode {
+        padding: 4px;
+        gap: 4px;
+    }
+
+    .compact-btn {
+        padding: 8px 6px;
+        font-size: 12px;
+    }
+
+    .compact-btn svg {
+        width: 16px;
+        height: 16px;
+    }
+}

@@ -27,7 +27,7 @@ const translations = {
         buttons: {
             analyze: "Analyze",
             import: "Import",
-            export: "Export",
+            export: "Consolidate",
             selectAll: "All",
             deselectAll: "None",
             save: "Save",
@@ -38,7 +38,7 @@ const translations = {
         },
         compact: {
             import: "Import",
-            export: "Export"
+            export: "Consolidate"
         },
         labels: {
             project: "Project:",
@@ -51,16 +51,16 @@ const translations = {
         },
         results: {
             importTitle: "Files to Import",
-            exportTitle: "Files to Export",
+            exportTitle: "Files to Consolidate",
             emptyImport: "No new files to import",
-            emptyExport: "All files are synchronized",
+            emptyExport: "All files are consolidated",
             importSubtitle: "From folder → Premiere Pro",
             exportSubtitle: "From Premiere Pro → folder",
             importButton: "Import",
-            exportButton: "Export"
+            exportButton: "Consolidate"
         },
         report: {
-            title: "Export Report",
+            title: "Consolidation Report",
             success: "Success",
             skipped: "Skipped (already exists)",
             failed: "Failed"
@@ -69,21 +69,21 @@ const translations = {
             analyzing: "Analyzing project...",
             searching: "Searching for new files...",
             importing: "Importing files...",
-            exporting: "Exporting files...",
+            exporting: "Consolidating files...",
             relinking: "Relinking media...",
             completed: "Operation completed",
             saved: "Settings saved",
             noNewFiles: "No new files to import",
-            allSynced: "All files are synchronized",
+            allSynced: "All files are consolidated",
             filesDetected: "file(s) detected",
             newFilesDetected: "new file(s) detected",
             filesImported: "file(s) imported successfully",
-            filesExported: "file(s) exported successfully",
+            filesExported: "file(s) consolidated successfully",
             autoImportStarted: "Auto-import started with interval",
             autoImportStopped: "Auto-import stopped",
             selectFolder: "Please select a root folder first",
             toImport: "to import",
-            toExport: "to export",
+            toExport: "to consolidate",
             noFilesToSync: "No files to synchronize"
         }
     },
@@ -108,7 +108,7 @@ const translations = {
         buttons: {
             analyze: "Analyser",
             import: "Importer",
-            export: "Exporter",
+            export: "Consolider",
             selectAll: "Tout",
             deselectAll: "Aucun",
             save: "Enregistrer",
@@ -119,7 +119,7 @@ const translations = {
         },
         compact: {
             import: "Importer",
-            export: "Exporter"
+            export: "Consolider"
         },
         labels: {
             project: "Projet:",
@@ -132,16 +132,16 @@ const translations = {
         },
         results: {
             importTitle: "Fichiers à Importer",
-            exportTitle: "Fichiers à Exporter",
+            exportTitle: "Fichiers à Consolider",
             emptyImport: "Aucun nouveau fichier à importer",
             emptyExport: "Tous les fichiers sont synchronisés",
             importSubtitle: "Du dossier → Premiere Pro",
             exportSubtitle: "De Premiere Pro → dossier",
             importButton: "Importer",
-            exportButton: "Exporter"
+            exportButton: "Consolider"
         },
         report: {
-            title: "Rapport d'Export",
+            title: "Rapport de Consolidation",
             success: "Succès",
             skipped: "Ignoré (existe déjà)",
             failed: "Échec"
@@ -150,7 +150,7 @@ const translations = {
             analyzing: "Analyse du projet...",
             searching: "Recherche de nouveaux fichiers...",
             importing: "Import des fichiers...",
-            exporting: "Export des fichiers...",
+            exporting: "Consolidation des fichiers...",
             relinking: "Liaison des médias...",
             completed: "Opération terminée",
             saved: "Paramètres enregistrés",
@@ -159,12 +159,12 @@ const translations = {
             filesDetected: "fichier(s) détecté(s)",
             newFilesDetected: "nouveau(x) fichier(s) détecté(s)",
             filesImported: "fichier(s) importé(s) avec succès",
-            filesExported: "fichier(s) exporté(s) avec succès",
+            filesExported: "fichier(s) consolidé(s) avec succès",
             autoImportStarted: "Import automatique démarré avec intervalle",
             autoImportStopped: "Import automatique arrêté",
             selectFolder: "Veuillez d'abord sélectionner un dossier racine",
             toImport: "à importer",
-            toExport: "à exporter",
+            toExport: "à consolider",
             noFilesToSync: "Aucun fichier à synchroniser"
         }
     }

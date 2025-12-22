@@ -325,10 +325,16 @@ function loadSettings() {
     document.getElementById('autoImport').checked = settings.autoImport || false;
     document.getElementById('autoImportInterval').value = settings.autoImportInterval || 30;
 
-    // Set language selector
+    // Set language selectors (both header and settings)
     const langSelect = document.getElementById('languageSelect');
+    const headerLangSelect = document.getElementById('headerLanguageSelect');
+    const currentLangValue = settings.language || 'en';
+
     if (langSelect) {
-        langSelect.value = settings.language || 'en';
+        langSelect.value = currentLangValue;
+    }
+    if (headerLangSelect) {
+        headerLangSelect.value = currentLangValue;
     }
 }
 
@@ -1561,13 +1567,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // Debug
     document.getElementById('clearLogsBtn').addEventListener('click', clearDebugLogs);
 
-    // Instant language change
-    document.getElementById('languageSelect').addEventListener('change', function () {
-        const newLang = this.value;
+    // Language change function
+    function changeLanguage(newLang) {
         currentLang = newLang;
         settings.language = newLang;
         localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
+
+        // Sync both language selectors
+        const langSelect = document.getElementById('languageSelect');
+        const headerLangSelect = document.getElementById('headerLanguageSelect');
+        if (langSelect) langSelect.value = newLang;
+        if (headerLangSelect) headerLangSelect.value = newLang;
+
         applyTranslations();
+    }
+
+    // Instant language change from settings
+    document.getElementById('languageSelect').addEventListener('change', function () {
+        changeLanguage(this.value);
+    });
+
+    // Instant language change from header
+    document.getElementById('headerLanguageSelect').addEventListener('change', function () {
+        changeLanguage(this.value);
     });
 
     // Initialize auto-import toggle buttons state

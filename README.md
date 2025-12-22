@@ -1,15 +1,16 @@
 # Premiere Pro File Manager
 
-A powerful Adobe Premiere Pro extension for managing project files, importing media, and organizing your project structure.
+A powerful Adobe Premiere Pro extension for managing project files, importing media, and consolidating your project structure.
 
 ## Features
 
 - 📥 **Smart Import**: Automatically detect and import new files from your project folder
-- 📤 **Export Management**: Organize external files into your project structure
-- 🔄 **Auto-Relink**: Automatically relink media when files are moved
+- 📦 **Consolidate**: Organize external files into your project structure (copy files that are outside your project folder)
+- 🔄 **Auto-Import Toggle**: Quick toggle button in header with visual feedback
+- 🔗 **Auto-Relink**: Automatically relink media when files are moved
 - 🚫 **File Filtering**: Exclude specific file types and folders
-- 🌍 **Multi-language**: Support for English and French
-- 🎨 **Responsive UI**: Adapts to different panel sizes
+- 🌍 **Multi-language**: Support for English and French with instant language switch
+- 🎨 **Responsive UI**: Adapts to different panel sizes with compact mode
 - 🔍 **Debug Mode**: Built-in diagnostics for troubleshooting
 
 ## Installation
@@ -35,25 +36,28 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 ### Import Files
 
 1. Set your project root folder in Settings (or use auto-detection)
-2. Click **Analyze All** to scan for new files
+2. Click **Analyze** to scan for new files
 3. Review the list of files to import
 4. Select the files you want to import
-5. Click **Import Selected**
+5. Click **Import**
 
-### Export Files
+### Consolidate Files
 
-The extension will detect files that are outside your project folder and allow you to copy them into your project structure while maintaining the bin organization.
+The extension will detect files that are used in your project but located outside your project folder. Click **Consolidate** to copy them into your project structure while maintaining the bin organization.
 
 ### Auto-Import
 
-Enable **Auto-Import** in Settings to automatically scan and import new files at regular intervals.
+- Use the **Auto toggle button** in the header for quick on/off control
+- Or enable in Settings for more options
+- The button turns green when auto-import is active
 
 ## Settings
 
+- **Language**: Quick language selector with flags (🇬🇧/🇫🇷) in header
 - **Root Folder**: Set the base folder for your project (auto-detected by default)
 - **Root Folder Levels**: Number of parent folders to go up from the .prproj file
-- **Auto-Relink**: Automatically relink media after copying
-- **Excluded Folders**: Folders to ignore during scanning
+- **Auto-Relink**: Automatically relink media after consolidation
+- **Excluded Folders**: Folders to ignore during consolidation
 - **Excluded Folder Names**: Folder names to exclude (e.g., "Backup", "Archive")
 - **Banned Extensions**: File types to never import
 - **Auto-Import**: Enable automatic scanning
@@ -61,12 +65,20 @@ Enable **Auto-Import** in Settings to automatically scan and import new files at
 
 ## Version History
 
-### v2.20.1 (Latest)
-- ✅ Fixed duplicate import detection for moved projects
-- ✅ Added filename fallback comparison for cross-computer compatibility
-- ✅ Fixed double slash path normalization
-- ✅ Made debug section collapsible and closed by default
-- ✅ Improved path comparison for files outside project root
+### v2.23.1 (Latest)
+- ✅ Added quick language selector with flag emojis in header
+- ✅ Instant language change without saving settings
+- ✅ Renamed "Export" to "Consolidate" for better clarity (matches Adobe terminology)
+- ✅ Added auto-import toggle button in header with visual feedback
+- ✅ Compact mode: auto button shows icon only
+- ✅ Fixed all translation inconsistencies
+
+### v2.20.1
+- Fixed duplicate import detection for moved projects
+- Added filename fallback comparison for cross-computer compatibility
+- Fixed double slash path normalization
+- Made debug section collapsible and closed by default
+- Improved path comparison for files outside project root
 
 ### v2.19.0
 - Added filename fallback for import duplicate detection
@@ -75,10 +87,6 @@ Enable **Auto-Import** in Settings to automatically scan and import new files at
 ### v2.18.0
 - Added debug UI for troubleshooting path issues
 - Improved logging and diagnostics
-
-### v2.17.0
-- Implemented relative path comparison for portable projects
-- Fixed duplicate detection when projects are moved
 
 ## Compatibility
 
@@ -97,15 +105,15 @@ Enable **Auto-Import** in Settings to automatically scan and import new files at
 ### Files are re-imported after moving project
 
 This should be fixed in v2.20.0+. If you're still experiencing this issue:
-1. Click **Analyze All**
+1. Click **Analyze**
 2. Open the **Debug Info** section (click to expand)
 3. Check the relative paths being compared
 4. Report the issue with the debug information
 
 ### Auto-import not working
 
-1. Check that Auto-Import is enabled in Settings
-2. Verify the Auto-Import Interval is set correctly
+1. Check that Auto-Import is enabled (button should be green)
+2. Verify the Auto-Import Interval is set correctly in Settings
 3. Make sure files are not in excluded folders or have banned extensions
 
 ## Development
@@ -119,7 +127,7 @@ PremiereFileManager/
 │   │   ├── index.html
 │   │   ├── css/
 │   │   ├── js/
-│   │   └── lang/        # Translations
+│   │   └── lang/        # Translations (en.json, fr.json)
 │   ├── host/            # ExtendScript (Premiere Pro API)
 │   │   └── index.jsx
 │   ├── CSXS/            # Extension manifest

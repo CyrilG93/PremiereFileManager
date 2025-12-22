@@ -134,7 +134,7 @@ const translations = {
             importTitle: "Fichiers à Importer",
             exportTitle: "Fichiers à Consolider",
             emptyImport: "Aucun nouveau fichier à importer",
-            emptyExport: "Tous les fichiers sont synchronisés",
+            emptyExport: "Tous les fichiers sont consolidés",
             importSubtitle: "Du dossier → Premiere Pro",
             exportSubtitle: "De Premiere Pro → dossier",
             importButton: "Importer",
@@ -155,7 +155,7 @@ const translations = {
             completed: "Opération terminée",
             saved: "Paramètres enregistrés",
             noNewFiles: "Aucun nouveau fichier à importer",
-            allSynced: "Tous les fichiers sont synchronisés",
+            allSynced: "Tous les fichiers sont consolidés",
             filesDetected: "fichier(s) détecté(s)",
             newFilesDetected: "nouveau(x) fichier(s) détecté(s)",
             filesImported: "fichier(s) importé(s) avec succès",
@@ -668,7 +668,7 @@ function displayDualResults() {
     // Display export files
     exportFilesList.innerHTML = '';
     if (exportFiles.length === 0) {
-        exportFilesList.innerHTML = '<div class="empty-state"><p>Tous les fichiers sont synchronisés</p></div>';
+        exportFilesList.innerHTML = `<div class="empty-state"><p>${t('results.emptyExport')}</p></div>`;
     } else {
         // Display export files (right column)
         exportFiles.forEach((file, index) => {
@@ -1560,6 +1560,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Debug
     document.getElementById('clearLogsBtn').addEventListener('click', clearDebugLogs);
+
+    // Instant language change
+    document.getElementById('languageSelect').addEventListener('change', function () {
+        const newLang = this.value;
+        currentLang = newLang;
+        settings.language = newLang;
+        localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
+        applyTranslations();
+    });
 
     // Initialize auto-import toggle buttons state
     updateAutoImportButtons();

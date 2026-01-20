@@ -485,7 +485,7 @@ function analyzeAll() {
 
         console.log('Preparing import script...');
         // First, scan for import files (same as auto-import)
-        const importScript = `scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
+        const importScript = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
 
         console.log('PROJECT ROOT FOR IMPORT:', rootPath);
         console.log('Calling evalScript for import...');
@@ -583,7 +583,7 @@ function analyzeAll() {
             updateProgress(50, 'Scan export...');
 
             // Then scan for export files
-            const exportScript = `getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`;
+            const exportScript = `FileManager_getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`;
 
             console.log('Calling evalScript for export...');
             csInterface.evalScript(exportScript, (exportResult) => {

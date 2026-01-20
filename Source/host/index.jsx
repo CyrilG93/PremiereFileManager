@@ -443,7 +443,7 @@ function FileManager_getFilesToSync(rootPath, excludedFoldersJson, levels) {
         }
 
         return JSON.stringify({
-            rootPath: getProjectRootPath(levelsToUse), // Use the determined levels
+            rootPath: FileManager_getProjectRootPath(levelsToUse), // Use the determined levels
             filesToSync: filesToSync,
             totalExternal: filesToSync.length
         });
@@ -632,7 +632,7 @@ function isFileStable(filePath) {
 // Get project root path based on project file location
 // levels: how many parent levels to go up from the .prproj file folder
 // 0 = same folder as .prproj, 1 = parent, 2 = grandparent, etc.
-function getProjectRootPath(levels) {
+function FileManager_getProjectRootPath(levels) {
     if (!app.project) {
         return null;
     }
@@ -749,7 +749,7 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
         // Use provided levels or default to 0
         var levelsToUse = (levels !== undefined && levels !== null) ? levels : 0;
 
-        var projectRoot = rootPath || getProjectRootPath(levelsToUse);
+        var projectRoot = rootPath || FileManager_getProjectRootPath(levelsToUse);
         if (!projectRoot) {
             return JSON.stringify({ error: "Cannot determine project root path" });
         }
@@ -785,7 +785,7 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
         }
 
         // Get project root
-        var projectRoot = rootPath || getProjectRootPath(levelsToUse);
+        var projectRoot = rootPath || FileManager_getProjectRootPath(levelsToUse);
         if (!projectRoot) {
             return JSON.stringify({ error: 'Could not determine project root' });
         }
@@ -896,28 +896,6 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
             }
         });
 
-    } catch (e) {
-        return JSON.stringify({ error: e.toString() });
-    }
-}
-
-// Get project root path with optional levels up
-function FileManager_getProjectRootPath(levels) {
-    try {
-        if (!app.project) {
-            return JSON.stringify({ error: "No project open" });
-        }
-
-        // Explicit type checking - allow 0 as a valid level
-        if (typeof levels !== 'number' || levels < 0) {
-            levels = 0; // Default to 0 (same folder as project file)
-        }
-
-        return JSON.stringify({
-            projectName: app.project.name,
-            projectRoot: FileManager_getProjectRootPath(levels),
-            projectPath: app.project.path
-        });
     } catch (e) {
         return JSON.stringify({ error: e.toString() });
     }

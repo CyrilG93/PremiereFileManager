@@ -39,7 +39,7 @@ function decodeURIPath(path) {
 }
 
 // Get current project path
-function getProjectPath() {
+function FileManager_getProjectPath() {
     if (app.project && app.project.path) {
         return app.project.path;
     }
@@ -141,8 +141,8 @@ function analyzeProject() {
         analyzeProjectItems(rootItem, fileList, '');
 
         var result = {
-            projectPath: getProjectPath(),
-            projectRoot: getProjectRootPath(0), // Default to 0 (same folder as project)
+            projectPath: FileManager_getProjectPath(),
+            projectRoot: FileManager_getProjectRootPath(0), // Default to 0 (same folder as project)
             files: fileList,
             totalFiles: fileList.length
         };
@@ -172,7 +172,7 @@ function isFileExternal(filePath, projectRoot) {
 }
 
 // Get files that need to be synchronized
-function getFilesToSync(rootPath, excludedFoldersJson) {
+function FileManager_getFilesToSync(rootPath, excludedFoldersJson) {
     try {
         var analysisResult = JSON.parse(analyzeProject());
 
@@ -246,7 +246,7 @@ function getFilesToSync(rootPath, excludedFoldersJson) {
         }
 
         return JSON.stringify({
-            rootPath: getProjectRootPath(0), // Default to 0 (same folder as project)
+            rootPath: FileManager_getProjectRootPath(0), // Default to 0 (same folder as project)
             filesToSync: filesToSync,
             totalExternal: filesToSync.length
         });
@@ -335,7 +335,7 @@ function relinkMedia(oldPath, newPath) {
     }
 }
 // Batch relink multiple files
-function batchRelinkMedia(relinkList) {
+function FileManager_batchRelinkMedia(relinkList) {
     try {
         var results = [];
         var list = JSON.parse(relinkList);
@@ -357,7 +357,7 @@ function batchRelinkMedia(relinkList) {
 }
 
 // Select folder dialog
-function selectFolder() {
+function FileManager_selectFolder() {
     var folder = Folder.selectDialog("Sélectionner le dossier racine du projet");
     if (folder) {
         return folder.fsName;
@@ -366,7 +366,7 @@ function selectFolder() {
 }
 
 // Get files to sync (export from project to folder)
-function getFilesToSync(rootPath, excludedFoldersJson, levels) {
+function FileManager_getFilesToSync(rootPath, excludedFoldersJson, levels) {
     try {
         var analysisResult = JSON.parse(analyzeProject());
 
@@ -377,7 +377,7 @@ function getFilesToSync(rootPath, excludedFoldersJson, levels) {
         // Use provided levels or default to 0
         var levelsToUse = (levels !== undefined && levels !== null) ? levels : 0;
 
-        var projectRoot = rootPath || getProjectRootPath(levelsToUse);
+        var projectRoot = rootPath || FileManager_getProjectRootPath(levelsToUse);
         if (!projectRoot) {
             return JSON.stringify({ error: "Cannot determine project root path" });
         }
@@ -453,29 +453,7 @@ function getFilesToSync(rootPath, excludedFoldersJson, levels) {
     }
 }
 
-// Get project info
-function getProjectInfo() {
-    try {
-        var project = app.project;
 
-        if (!project) {
-            return JSON.stringify({ error: "No active project" });
-        }
-
-        var info = {
-            name: project.name,
-            path: project.path || null,
-            rootPath: getProjectRootPath(),
-            sequences: project.sequences.numSequences,
-            rootItems: project.rootItem.children.numItems
-        };
-
-        return JSON.stringify(info);
-
-    } catch (e) {
-        return JSON.stringify({ error: e.toString() });
-    }
-}
 // Import-related functions for v2.0
 
 // Recursively scan folder for all media files
@@ -742,7 +720,7 @@ function getProjectFilesList(projectRoot) {
 }
 
 // Scan for new files not in project
-function scanForNewFiles(rootPath, excludedFoldersJson, bannedExtensionsJson, excludedFolderNamesJson, levels) {
+function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtensionsJson, excludedFolderNamesJson, levels) {
     try {
         // Use provided levels or default to 0
         var levelsToUse = (levels !== undefined && levels !== null) ? levels : 0;
@@ -899,8 +877,8 @@ function scanForNewFiles(rootPath, excludedFoldersJson, bannedExtensionsJson, ex
     }
 }
 
-// Get project information
-function getProjectInfo(levels) {
+// Get project root path with optional levels up
+function FileManager_getProjectRootPath(levels) {
     try {
         if (!app.project) {
             return JSON.stringify({ error: "No project open" });
@@ -913,7 +891,7 @@ function getProjectInfo(levels) {
 
         return JSON.stringify({
             projectName: app.project.name,
-            projectRoot: getProjectRootPath(levels),
+            projectRoot: FileManager_getProjectRootPath(levels),
             projectPath: app.project.path
         });
     } catch (e) {
@@ -956,7 +934,7 @@ function getOrCreateBin(binPath) {
 }
 
 // Import files to project
-function importFilesToProject(filesJson) {
+function FileManager_importFilesToProject(filesJson) {
     try {
         var files = JSON.parse(filesJson);
         var results = [];
@@ -1110,10 +1088,11 @@ function base64Decode(str) {
 }
 
 // Import files using base64 encoded JSON (safer than escaping)
-function importFilesToProjectBase64(base64Json) {
+// Import files using base64 encoded JSON (safer for special characters)
+function FileManager_importFilesToProjectBase64(base64Json) {
     try {
         var filesJson = base64Decode(base64Json);
-        return importFilesToProject(filesJson);
+        return FileManager_importFilesToProject(filesJson);
     } catch (e) {
         return JSON.stringify({ error: 'Base64 decode error: ' + e.toString() });
     }

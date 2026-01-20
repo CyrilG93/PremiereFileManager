@@ -435,7 +435,7 @@ function updateProgress(percent, message) {
 function getProjectInfo() {
     const levels = (typeof settings.rootFolderLevels === 'number') ? settings.rootFolderLevels : 0;
     console.log('getProjectInfo called with levels:', levels);
-    csInterface.evalScript(`getProjectInfo(${levels})`, (result) => {
+    csInterface.evalScript(`FileManager_getProjectInfo(${levels})`, (result) => {
         try {
             const info = JSON.parse(result);
 
@@ -796,7 +796,7 @@ async function exportSelected() {
             if (relinkList.length > 0) {
                 await new Promise((resolve) => {
                     const relinkJson = JSON.stringify(relinkList);
-                    csInterface.evalScript(`batchRelinkMedia('${relinkJson}')`, (result) => {
+                    csInterface.evalScript(`FileManager_batchRelinkMedia('${relinkJson}')`, (result) => {
                         console.log('Relink result:', result);
                         resolve();
                     });
@@ -962,7 +962,7 @@ async function synchronizeFiles() {
 
             if (relinkList.length > 0) {
                 await new Promise((resolve) => {
-                    csInterface.evalScript(`batchRelinkMedia('${JSON.stringify(relinkList)}')`, (result) => {
+                    csInterface.evalScript(`FileManager_batchRelinkMedia('${JSON.stringify(relinkList)}')`, (result) => {
                         resolve();
                     });
                 });
@@ -1036,7 +1036,7 @@ function closeSettings() {
 
 // Browse for root folder
 function browseRootFolder() {
-    csInterface.evalScript('selectFolder()', (result) => {
+    csInterface.evalScript('FileManager_selectFolder()', (result) => {
         if (result && result !== 'null') {
             document.getElementById('rootFolder').value = result;
         }
@@ -1055,8 +1055,8 @@ async function compactSync() {
     const levels = settings.rootFolderLevels || 0;
     const excludedFolders = JSON.stringify(settings.excludedFolders || []);
     const scriptCall = rootPath
-        ? `getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`
-        : `getFilesToSync('', '${excludedFolders}', ${levels})`;
+        ? `FileManager_getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`
+        : `FileManager_getFilesToSync('', '${excludedFolders}', ${levels})`;
 
     csInterface.evalScript(scriptCall, async (result) => {
         try {
@@ -1104,7 +1104,7 @@ async function compactSync() {
 
                 if (relinkList.length > 0) {
                     await new Promise((resolve) => {
-                        csInterface.evalScript(`batchRelinkMedia('${JSON.stringify(relinkList)}')`, () => {
+                        csInterface.evalScript(`FileManager_batchRelinkMedia('${JSON.stringify(relinkList)}')`, () => {
                             resolve();
                         });
                     });
@@ -1142,7 +1142,7 @@ async function compactImport() {
     const excludedFolders = JSON.stringify(settings.excludedFolders || []);
     const bannedExtensions = JSON.stringify(settings.bannedExtensions || []);
     const excludedFolderNames = JSON.stringify(settings.excludedFolderNames || []);
-    const importScript = `scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
+    const importScript = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
 
     csInterface.evalScript(importScript, (importResult) => {
         try {
@@ -1156,7 +1156,7 @@ async function compactImport() {
 
             // Import all files
             const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(filesToImport))));
-            csInterface.evalScript(`importFilesToProjectBase64('${base64Data}')`, (result) => {
+            csInterface.evalScript(`FileManager_importFilesToProjectBase64('${base64Data}')`, (result) => {
                 compactImportBtn.disabled = false;
             });
         } catch (e) {
@@ -1174,7 +1174,7 @@ async function compactExport() {
     const rootPath = (settings.rootFolder || '').replace(/\\/g, '\\\\');
     const levels = settings.rootFolderLevels || 0;
     const excludedFolders = JSON.stringify(settings.excludedFolders || []);
-    const exportScript = `getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`;
+    const exportScript = `FileManager_getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`;
 
     csInterface.evalScript(exportScript, async (exportResult) => {
         try {
@@ -1220,7 +1220,7 @@ async function compactExport() {
                 if (relinkList.length > 0) {
                     await new Promise((resolve) => {
                         const relinkJson = JSON.stringify(relinkList);
-                        csInterface.evalScript(`batchRelinkMedia('${relinkJson}')`, () => resolve());
+                        csInterface.evalScript(`FileManager_batchRelinkMedia('${relinkJson}')`, () => resolve());
                     });
                 }
             }
@@ -1248,7 +1248,7 @@ function analyzeForImport() {
     const excludedFolders = JSON.stringify(settings.excludedFolders || []);
     const bannedExtensions = JSON.stringify(settings.bannedExtensions || []);
     const excludedFolderNames = JSON.stringify(settings.excludedFolderNames || []);
-    const scriptCall = `scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
+    const scriptCall = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
 
     csInterface.evalScript(scriptCall, (result) => {
         try {
@@ -1328,7 +1328,7 @@ function importSelected() {
     debugLog(`Appel ExtendScript avec ${selectedFiles.length} fichiers (base64)`, 'info');
     debugLog(`Taille base64: ${base64Data.length} caractères`, 'info');
 
-    csInterface.evalScript(`importFilesToProjectBase64('${base64Data}')`, (result) => {
+    csInterface.evalScript(`FileManager_importFilesToProjectBase64('${base64Data}')`, (result) => {
         debugLog(`ExtendScript a répondu: ${result ? result.substring(0, 100) : 'null'}...`, 'info');
 
         try {
@@ -1408,7 +1408,7 @@ function startAutoImport() {
             const bannedExtensions = JSON.stringify(settings.bannedExtensions || []);
             const excludedFolderNames = JSON.stringify(settings.excludedFolderNames || []);
 
-            const scanScript = `scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
+            const scanScript = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
 
             csInterface.evalScript(scanScript, async (result) => {
                 try {
@@ -1426,7 +1426,7 @@ function startAutoImport() {
                         // Import new files
                         const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(newFiles))));
 
-                        csInterface.evalScript(`importFilesToProjectBase64('${base64Data}')`, (importResult) => {
+                        csInterface.evalScript(`FileManager_importFilesToProjectBase64('${base64Data}')`, (importResult) => {
                             try {
                                 const importData = JSON.parse(importResult);
 

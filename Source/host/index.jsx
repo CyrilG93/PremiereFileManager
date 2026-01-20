@@ -454,6 +454,30 @@ function FileManager_getFilesToSync(rootPath, excludedFoldersJson, levels) {
 }
 
 
+// Get project info
+function FileManager_getProjectInfo(levels) {
+    try {
+        var project = app.project;
+
+        if (!project) {
+            return JSON.stringify({ error: "No active project" });
+        }
+
+        var info = {
+            name: project.name,
+            path: project.path || null,
+            rootPath: FileManager_getProjectRootPath(levels),
+            sequences: project.sequences.numSequences,
+            rootItems: project.rootItem.children.numItems
+        };
+
+        return JSON.stringify(info);
+
+    } catch (e) {
+        return JSON.stringify({ error: e.toString() });
+    }
+}
+
 // Import-related functions for v2.0
 
 // Recursively scan folder for all media files

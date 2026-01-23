@@ -887,12 +887,17 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
                 totalScanned: scannedFiles.length,
                 totalInProject: projectFiles.length,
                 sampleProjectFiles: projectFiles.slice(0, 3), // First 3 files in project (relative paths)
-                sampleScannedFiles: scannedFiles.slice(0, 3).map(function (f) {
-                    return {
-                        absolute: f.path,
-                        relative: getRelativePath(f.path, projectRoot)
-                    };
-                })
+                sampleScannedFiles: (function () {
+                    var samples = [];
+                    var limit = Math.min(3, scannedFiles.length);
+                    for (var i = 0; i < limit; i++) {
+                        samples.push({
+                            absolute: scannedFiles[i].path,
+                            relative: getRelativePath(scannedFiles[i].path, projectRoot)
+                        });
+                    }
+                    return samples;
+                })()
             }
         });
 
@@ -1027,7 +1032,13 @@ function FileManager_importFilesToProject(filesJson) {
 
         return JSON.stringify({
             results: results,
-            totalImported: results.filter(function (r) { return r.success; }).length
+            totalImported: (function () {
+                var count = 0;
+                for (var i = 0; i < results.length; i++) {
+                    if (results[i].success) count++;
+                }
+                return count;
+            })()
         });
 
     } catch (e) {

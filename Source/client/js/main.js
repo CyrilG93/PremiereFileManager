@@ -227,7 +227,7 @@ let settings = {
     rootFolderLevels: 0, // How many parent levels to go up from project file (0 = same folder, 1 = parent, 2 = grandparent)
     autoRelink: true,
     excludedFolders: [],
-    excludedFolderNames: ['node_modules', '.git', '__MACOSX', 'Premiere Pro Auto-Save', 'Adobe Premiere Pro Auto-Save'],
+    excludedFolderNames: ['Premiere Pro Auto-Save', 'Adobe Premiere Pro Auto-Save'],
     bannedExtensions: [
         // Archives
         '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz',
@@ -238,15 +238,15 @@ let settings = {
         // Temporary/System
         '.tmp', '.temp', '.part', '.download', '.crdownload', '.ini', '.log', '.db', '.cache',
         // Premiere/Adobe files
-        '.prproj', '.prlock', '.aep', '.aet', '.mogrt', '.pek', '.cfa', '.xmp', '.edl',
+        '.prproj', '.prlock', '.aep', '.aet', '.pek', '.cfa', '.xmp', '.edl',
         // RAW photo formats (not supported by Premiere)
         '.arw', '.cr2', '.cr3', '.nef', '.nrw', '.orf', '.rw2', '.pef', '.raf', '.dng', '.raw',
         // Other image formats not supported
-        '.indd', '.eps', '.bmp', '.ico',
+        '.indd', '.eps', '.bmp', '.ico', '.avif',
         // Audio formats not commonly used in video editing
         '.flac', '.ape', '.alac', '.wma', '.ogg', '.opus',
         // Other non-media
-        '.html', '.css', '.js', '.json', '.xml', '.svg', '.md', '.clipchamp', '.ytdl',
+        '.html', '.css', '.js', '.json', '.xml', '.svg', '.md', '.clipchamp', '.ytdl', '.part',
     ],
     autoImport: false,
     autoImportInterval: 30,

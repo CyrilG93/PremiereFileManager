@@ -65,6 +65,11 @@ The extension will detect files that are used in your project but located outsid
 
 ## Version History
 
+### v1.0.6 (Latest)
+- **Fix**: Installers now automaticall enable PlayerDebugMode on both macOS and Windows
+- **Improvement**: Simplified installation process
+
+
 ### v2.23.1 (Latest)
 - ✅ Added quick language selector with flag emojis in header
 - ✅ Instant language change without saving settings

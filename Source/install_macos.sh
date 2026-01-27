@@ -43,6 +43,18 @@ rm -f "$INSTALL_DIR/install_windows.bat"
 # Set permissions
 chmod -R 755 "$INSTALL_DIR"
 
+echo "🔧 Enabling PlayerDebugMode for unsigned extensions..."
+# Enable debug mode for all CSXS versions
+defaults write com.adobe.CSXS.9 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.10 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.11 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.12 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.13 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.14 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.15 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.16 PlayerDebugMode 1 2>/dev/null
+echo "   ✓ Debug mode enabled for CSXS 9-16"
+
 echo ""
 echo "✓ Installation completed successfully!"
 echo ""

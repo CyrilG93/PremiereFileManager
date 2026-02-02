@@ -403,7 +403,7 @@ function loadSettings() {
     document.getElementById('autoRelink').checked = settings.autoRelink !== false;
     document.getElementById('excludedFolders').value = (settings.excludedFolders || []).join('\n');
     document.getElementById('excludedFolderNames').value = (settings.excludedFolderNames || []).join('\n');
-    document.getElementById('bannedExtensions').value = (settings.bannedExtensions || []).join('\n');
+    document.getElementById('bannedExtensions').value = (settings.bannedExtensions || []).sort().join('\n');
     document.getElementById('autoImport').checked = settings.autoImport || false;
     document.getElementById('autoImportInterval').value = settings.autoImportInterval || 30;
 
@@ -446,7 +446,8 @@ function saveSettings() {
         .split('\n')
         .map(ext => ext.trim())
         .filter(ext => ext !== '')
-        .map(ext => ext.startsWith('.') ? ext : '.' + ext); // Ensure dot prefix
+        .map(ext => ext.startsWith('.') ? ext : '.' + ext) // Ensure dot prefix
+        .sort(); // Sort alphabetically
 
     settings.autoImport = document.getElementById('autoImport').checked;
     settings.autoImportInterval = parseInt(document.getElementById('autoImportInterval').value) || 30;

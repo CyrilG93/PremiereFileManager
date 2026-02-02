@@ -218,6 +218,7 @@ function changeLanguage(lang) {
 
         // Save to settings
         settings.language = lang;
+        fm_writeSettingsToFile(settings);
         localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
     }
 }
@@ -253,9 +254,92 @@ let settings = {
     language: 'en' // Default language
 };
 
-// Load settings from localStorage
+// ============================================================================
+// FILE-BASED SETTINGS STORAGE (persists across Premiere versions)
+// ============================================================================
+const fm_fs = require('fs');
+const fm_path = require('path');
+const fm_os = require('os');
+
+/**
+ * Get the path to the settings file (cross-platform)
+ * macOS: ~/Library/Application Support/PremiereFileManager/settings.json
+ * Windows: %APPDATA%/PremiereFileManager/settings.json
+ */
+function fm_getSettingsDir() {
+    const platform = fm_os.platform();
+    if (platform === 'darwin') {
+        return fm_path.join(fm_os.homedir(), 'Library', 'Application Support', 'PremiereFileManager');
+    } else {
+        // Windows
+        return fm_path.join(process.env.APPDATA || fm_os.homedir(), 'PremiereFileManager');
+    }
+}
+
+function fm_getSettingsFilePath() {
+    return fm_path.join(fm_getSettingsDir(), 'settings.json');
+}
+
+/**
+ * Read settings from JSON file
+ * Returns null if file doesn't exist or is invalid
+ */
+function fm_readSettingsFromFile() {
+    try {
+        const filePath = fm_getSettingsFilePath();
+        if (fm_fs.existsSync(filePath)) {
+            const data = fm_fs.readFileSync(filePath, 'utf8');
+            return JSON.parse(data);
+        }
+    } catch (e) {
+        console.error('Error reading settings file:', e);
+    }
+    return null;
+}
+
+/**
+ * Write settings to JSON file
+ */
+function fm_writeSettingsToFile(settingsData) {
+    try {
+        const dir = fm_getSettingsDir();
+        if (!fm_fs.existsSync(dir)) {
+            fm_fs.mkdirSync(dir, { recursive: true });
+        }
+        const filePath = fm_getSettingsFilePath();
+        fm_fs.writeFileSync(filePath, JSON.stringify(settingsData, null, 2), 'utf8');
+        console.log('Settings saved to file:', filePath);
+        return true;
+    } catch (e) {
+        console.error('Error writing settings file:', e);
+        return false;
+    }
+}
+
+// Load settings from localStorage or persistent file
 function loadSettings() {
-    const saved = localStorage.getItem('fileManagerSettings');
+    let migratedFromLocalStorage = false;
+    let loadedSettings = null;
+
+    // First, try to load from JSON file (persistent across Premiere versions)
+    const fileSettings = fm_readSettingsFromFile();
+
+    if (fileSettings) {
+        loadedSettings = fileSettings;
+        console.log('Settings loaded from file:', fm_getSettingsFilePath());
+    } else {
+        // Fallback: migrate from localStorage
+        const saved = localStorage.getItem('fileManagerSettings');
+        if (saved) {
+            try {
+                loadedSettings = JSON.parse(saved);
+                migratedFromLocalStorage = true;
+                console.log('Settings migrated from localStorage');
+            } catch (e) {
+                console.error('Error loading settings from localStorage:', e);
+            }
+        }
+    }
 
     // Default banned extensions list (keep in sync with settings object)
     const defaultBannedExtensions = [
@@ -270,37 +354,25 @@ function loadSettings() {
         '.html', '.css', '.js', '.json', '.xml', '.svg', '.md', '.clipchamp', '.ytdl'
     ];
 
-    if (saved) {
-        try {
-            const savedSettings = JSON.parse(saved);
-
-            // Merge user's custom banned extensions with defaults
-            // This preserves user additions while ensuring all defaults are present
-            let mergedBannedExtensions = defaultBannedExtensions;
-            if (savedSettings.bannedExtensions && Array.isArray(savedSettings.bannedExtensions)) {
-                // Create a Set to avoid duplicates
-                const extensionsSet = new Set([
-                    ...defaultBannedExtensions,
-                    ...savedSettings.bannedExtensions
-                ]);
-                mergedBannedExtensions = Array.from(extensionsSet);
-            }
-
-            // Merge saved settings with defaults to ensure all properties exist
-            settings = {
-                ...settings, // Start with defaults
-                ...savedSettings, // Override with saved values
-                // Use merged list (defaults + user additions)
-                bannedExtensions: mergedBannedExtensions,
-                excludedFolderNames: savedSettings.excludedFolderNames || settings.excludedFolderNames,
-                excludedFolders: savedSettings.excludedFolders || settings.excludedFolders
-            };
-
-            // Save merged settings back to localStorage
-            localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
-        } catch (e) {
-            console.error('Error loading settings:', e);
+    if (loadedSettings) {
+        // Merge user's custom banned extensions with defaults
+        let mergedBannedExtensions = defaultBannedExtensions;
+        if (loadedSettings.bannedExtensions && Array.isArray(loadedSettings.bannedExtensions)) {
+            const extensionsSet = new Set([
+                ...defaultBannedExtensions,
+                ...loadedSettings.bannedExtensions
+            ]);
+            mergedBannedExtensions = Array.from(extensionsSet);
         }
+
+        // Merge saved settings with defaults
+        settings = {
+            ...settings, // Start with defaults
+            ...loadedSettings, // Override with saved values
+            bannedExtensions: mergedBannedExtensions,
+            excludedFolderNames: loadedSettings.excludedFolderNames || settings.excludedFolderNames,
+            excludedFolders: loadedSettings.excludedFolders || settings.excludedFolders
+        };
 
         // Load language if saved
         if (settings.language && translations[settings.language]) {
@@ -308,12 +380,22 @@ function loadSettings() {
             updateUILanguage();
         }
     } else {
-        // First time use - ensure default banned extensions are set
+        // First time use - ensure defaults
         settings.bannedExtensions = defaultBannedExtensions;
-        // Save defaults to localStorage
-        localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
-        console.log('First use: Applied default banned extensions');
+        console.log('First use: Applied default settings');
+
+        // Save defaults to file immediately
+        fm_writeSettingsToFile(settings);
     }
+
+    // If migrated from localStorage, save to file
+    if (migratedFromLocalStorage) {
+        fm_writeSettingsToFile(settings);
+        console.log('Migration complete: settings saved to persistent file storage');
+    }
+
+    // Always sync back to localStorage as backup/legacy support
+    localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
 
     // Update UI fields with current settings (whether loaded or defaults)
     document.getElementById('rootFolder').value = settings.rootFolder || '';
@@ -338,7 +420,7 @@ function loadSettings() {
     }
 }
 
-// Save settings to localStorage
+// Save settings to persistent storage
 function saveSettings() {
     settings.rootFolder = document.getElementById('rootFolder').value;
     settings.rootFolderLevels = parseInt(document.getElementById('rootFolderLevels').value) || 0;
@@ -375,7 +457,11 @@ function saveSettings() {
         changeLanguage(newLang);
     }
 
+    // Save to persistent file storage
+    fm_writeSettingsToFile(settings);
+    // Also save to localStorage as backup
     localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
+
     showStatus(t('status.saved'), 'success');
 
     // Refresh project info to update displayed root folder

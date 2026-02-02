@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.filemanager.premiere" ExtensionBundleVersion="1.0.6"
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.filemanager.premiere" ExtensionBundleVersion="1.0.7"
                    ExtensionBundleName="File Manager" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <Author>
     <![CDATA[File Manager Extension]]>
@@ -12,7 +12,7 @@
     <![CDATA[Synchronize project files by copying external media into the project folder structure.]]>
   </Abstract>
   <ExtensionList>
-    <Extension Id="com.filemanager.premiere.panel" Version="1.0.6"/>
+    <Extension Id="com.filemanager.premiere.panel" Version="1.0.7"/>
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

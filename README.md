@@ -70,7 +70,7 @@ The extension will detect files that are used in your project but located outsid
 - **Improvement**: Simplified installation process
 
 
-### v2.23.1 (Latest)
+### v1.0.5
 - ✅ Added quick language selector with flag emojis in header
 - ✅ Instant language change without saving settings
 - ✅ Renamed "Export" to "Consolidate" for better clarity (matches Adobe terminology)
@@ -78,18 +78,18 @@ The extension will detect files that are used in your project but located outsid
 - ✅ Compact mode: auto button shows icon only
 - ✅ Fixed all translation inconsistencies
 
-### v2.20.1
+### v1.0.4
 - Fixed duplicate import detection for moved projects
 - Added filename fallback comparison for cross-computer compatibility
 - Fixed double slash path normalization
 - Made debug section collapsible and closed by default
 - Improved path comparison for files outside project root
 
-### v2.19.0
+### v1.0.3
 - Added filename fallback for import duplicate detection
 - Improved handling of files moved between computers
 
-### v2.18.0
+### v1.0.2
 - Added debug UI for troubleshooting path issues
 - Improved logging and diagnostics
 

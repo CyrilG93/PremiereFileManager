@@ -1,8 +1,17 @@
 // File operations using Node.js
 // This module handles file copying and directory creation
+// Optimized for large files and NAS targets with streaming and retry support
 
 const fs = require('fs');
 const path = require('path');
+
+// Configuration for NAS-optimized file operations
+const FM_COPY_CONFIG = {
+    CHUNK_SIZE: 16 * 1024 * 1024,  // 16MB chunks for network stability
+    MAX_RETRIES: 3,                 // Maximum retry attempts
+    RETRY_DELAY_BASE: 1000,         // Base delay for exponential backoff (ms)
+    HIGH_WATER_MARK: 16 * 1024 * 1024 // Stream buffer size
+};
 
 // Normalize path for current platform
 function normalizePathForPlatform(filePath) {
@@ -34,9 +43,102 @@ function createDirectory(dirPath) {
     }
 }
 
-// Copy file
-function copyFile(source, destination) {
+// Streaming file copy - optimized for large files and NAS targets
+// Uses streams with chunking to prevent EBADF errors on network mounts
+function fm_copyFileStreaming(source, destination, progressCallback) {
     return new Promise((resolve, reject) => {
+        const normalizedSource = normalizePathForPlatform(source);
+        const normalizedDest = normalizePathForPlatform(destination);
+
+        let stats;
+        try {
+            stats = fs.statSync(normalizedSource);
+        } catch (err) {
+            reject(new Error('Cannot read source file: ' + err.message));
+            return;
+        }
+
+        const totalSize = stats.size;
+        let copiedBytes = 0;
+
+        const readStream = fs.createReadStream(normalizedSource, {
+            highWaterMark: FM_COPY_CONFIG.HIGH_WATER_MARK
+        });
+
+        const writeStream = fs.createWriteStream(normalizedDest, {
+            highWaterMark: FM_COPY_CONFIG.HIGH_WATER_MARK
+        });
+
+        // Track progress on data chunks
+        readStream.on('data', (chunk) => {
+            copiedBytes += chunk.length;
+            if (progressCallback) {
+                progressCallback(copiedBytes, totalSize);
+            }
+        });
+
+        // Handle read errors
+        readStream.on('error', (err) => {
+            writeStream.destroy();
+            reject(new Error('Read error: ' + err.message));
+        });
+
+        // Handle write errors (common on NAS disconnects)
+        writeStream.on('error', (err) => {
+            readStream.destroy();
+            reject(new Error('Write error: ' + err.message));
+        });
+
+        // Success when write completes
+        writeStream.on('finish', () => {
+            resolve({ success: true, size: totalSize });
+        });
+
+        // Pipe data from source to destination
+        readStream.pipe(writeStream);
+    });
+}
+
+// Copy file with automatic retry - handles transient NAS connection issues
+async function fm_copyFileWithRetry(source, destination, maxRetries = FM_COPY_CONFIG.MAX_RETRIES, progressCallback) {
+    const normalizedDest = normalizePathForPlatform(destination);
+    let lastError;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const result = await fm_copyFileStreaming(source, destination, progressCallback);
+            return result;
+        } catch (err) {
+            lastError = err;
+            console.warn(`[PremiereFileManager] Copy attempt ${attempt}/${maxRetries} failed: ${err.message}`);
+
+            // Clean up partial/corrupted file on destination
+            try {
+                if (fs.existsSync(normalizedDest)) {
+                    fs.unlinkSync(normalizedDest);
+                    console.log(`[PremiereFileManager] Cleaned up partial file: ${normalizedDest}`);
+                }
+            } catch (cleanupErr) {
+                console.warn(`[PremiereFileManager] Could not clean up partial file: ${cleanupErr.message}`);
+            }
+
+            // Wait before retry with exponential backoff
+            if (attempt < maxRetries) {
+                const delay = FM_COPY_CONFIG.RETRY_DELAY_BASE * Math.pow(2, attempt - 1);
+                console.log(`[PremiereFileManager] Retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+
+    // All retries exhausted
+    throw new Error(`Failed after ${maxRetries} attempts: ${lastError.message}`);
+}
+
+// Copy file - main entry point
+// Uses streaming for large files (>50MB) or when destination looks like a network path
+function copyFile(source, destination) {
+    return new Promise(async (resolve, reject) => {
         try {
             // Normalize paths
             const normalizedSource = normalizePathForPlatform(source);
@@ -61,12 +163,47 @@ function copyFile(source, destination) {
                 return;
             }
 
-            // Copy file synchronously to ensure binary integrity
+            // Determine if we should use streaming (large files or network paths)
+            let useStreaming = false;
+            const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+
             try {
-                fs.copyFileSync(normalizedSource, normalizedDest);
-                resolve({ success: true });
-            } catch (err) {
-                reject(err);
+                const stats = fs.statSync(normalizedSource);
+                // Use streaming for large files
+                if (stats.size > LARGE_FILE_THRESHOLD) {
+                    useStreaming = true;
+                }
+            } catch (e) {
+                // If we can't stat, fallback to streaming for safety
+                useStreaming = true;
+            }
+
+            // Check if destination looks like a network path (NAS, SMB, etc.)
+            const isNetworkPath = normalizedDest.startsWith('/Volumes/') ||
+                normalizedDest.startsWith('//') ||
+                normalizedDest.match(/^[A-Z]:\\\\[^\\]+\\\\/i) ||
+                normalizedDest.includes('\\\\');
+
+            if (isNetworkPath) {
+                useStreaming = true;
+            }
+
+            if (useStreaming) {
+                // Use streaming copy with retry for large files and network destinations
+                try {
+                    const result = await fm_copyFileWithRetry(normalizedSource, normalizedDest);
+                    resolve(result);
+                } catch (err) {
+                    reject(err);
+                }
+            } else {
+                // Use sync copy for small local files (faster)
+                try {
+                    fs.copyFileSync(normalizedSource, normalizedDest);
+                    resolve({ success: true });
+                } catch (err) {
+                    reject(err);
+                }
             }
 
         } catch (e) {

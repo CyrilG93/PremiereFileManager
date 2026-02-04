@@ -174,9 +174,11 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
                 fm_debugLog(`[STREAM] EBADF on close after 100% read, verifying...`);
                 // Wait for NAS to flush writes, then verify
                 setTimeout(() => {
+                    if (settled) return;
                     if (!verifyAndResolve()) {
                         // Try one more time with longer delay
                         setTimeout(() => {
+                            if (settled) return;
                             if (!verifyAndResolve()) {
                                 settled = true;
                                 fm_debugLog(`[STREAM] Verification failed after EBADF`, 'error');
@@ -201,8 +203,10 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
             if (err.code === 'EBADF' && copiedBytes >= totalSize) {
                 fm_debugLog(`[STREAM] EBADF on write close after 100%, verifying...`);
                 setTimeout(() => {
+                    if (settled) return;
                     if (!verifyAndResolve()) {
                         setTimeout(() => {
+                            if (settled) return;
                             if (!verifyAndResolve()) {
                                 settled = true;
                                 fm_debugLog(`[STREAM] Verification failed after write EBADF`, 'error');

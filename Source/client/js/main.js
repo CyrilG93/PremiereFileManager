@@ -1005,12 +1005,7 @@ function debugLog(message, level = 'info') {
         debugLogs.appendChild(logEntry);
         debugLogs.scrollTop = debugLogs.scrollHeight;
 
-        // Show debug section content when there are logs
-        if (debugLogsContent) {
-            debugLogsContent.style.display = 'block';
-            const toggleIcon = document.getElementById('debugLogsToggleIcon');
-            if (toggleIcon) toggleIcon.classList.add('open');
-        }
+        // Don't auto-open the debug panel - let the user control it
     } catch (e) {
         // Silently fail if UI logging doesn't work
         console.error('Debug log UI error:', e);

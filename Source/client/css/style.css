@@ -1132,7 +1132,9 @@ button svg {
     .sync-controls,
     .report-section,
     .status-message,
-    .compact-status {
+    .compact-status,
+    .debug-logs-section,
+    #consolidationProgress {
         display: none !important;
     }
 

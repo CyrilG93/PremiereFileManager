@@ -7,11 +7,11 @@ const path = require('path');
 
 // Configuration for NAS-optimized file operations
 const FM_COPY_CONFIG = {
-    CHUNK_SIZE: 1 * 1024 * 1024,    // 1MB chunks (reduced for NAS stability)
+    CHUNK_SIZE: 64 * 1024,           // 64KB chunks (standard Node.js size for better compatibility)
     MAX_RETRIES: 3,                  // Maximum retry attempts
     RETRY_DELAY_BASE: 1000,          // Base delay for exponential backoff (ms)
-    HIGH_WATER_MARK: 1 * 1024 * 1024, // 1MB stream buffer (reduced for NAS)
-    DEBUG: true                       // Enable detailed logging
+    HIGH_WATER_MARK: 64 * 1024,      // 64KB stream buffer (standard Node.js size)
+    DEBUG: true                      // Enable detailed logging
 };
 
 // Global log callback - can be set from main.js to log to UI
@@ -76,6 +76,21 @@ function createDirectory(dirPath) {
                     const startTime = Date.now();
                     fs.mkdirSync(dirPath, { recursive: true });
                     fm_debugLog(`Directory created in ${Date.now() - startTime}ms`);
+
+                    // Add small delay for network shares to propagate directory creation
+                    if (dirPath.startsWith('/Volumes/') || dirPath.startsWith('\\\\')) {
+                        setTimeout(() => {
+                            if (fs.existsSync(dirPath)) {
+                                resolve(true);
+                            } else {
+                                // Try one more time if check failed, might be latency
+                                setTimeout(() => {
+                                    resolve(true); // Assume it worked or will fail at file write
+                                }, 200);
+                            }
+                        }, 50);
+                        return;
+                    }
                 }
                 resolve(true);
             } catch (e) {

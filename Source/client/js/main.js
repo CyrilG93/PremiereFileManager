@@ -1630,6 +1630,14 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
     getProjectInfo();
 
+    // Connect fileOperations.js logging to the UI debug panel
+    if (typeof fm_setLogCallback === 'function') {
+        fm_setLogCallback((message, level) => {
+            debugLog(message, level);
+        });
+        debugLog('File operations logging connected', 'info');
+    }
+
     document.getElementById('settingsBtn').addEventListener('click', openSettings);
     document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
     document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);

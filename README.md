@@ -65,9 +65,21 @@ The extension will detect files that are used in your project but located outsid
 
 ## Version History
 
-### v1.0.6 (Latest)
-- **Fix**: Installers now automaticall enable PlayerDebugMode on both macOS and Windows
-- **Improvement**: Simplified installation process
+### v1.1.0 (Latest)
+- 🚀 **NAS Optimization**: Massive performance boost (up to 20x faster) and reliability fix for network transfers (EBADF)
+- 📊 **Progress UI**: Added detailed consolidation progress bar with real-time speed and ETA
+- 🛡️ **Stability**: Enhanced verification logic for zero-error file transfers
+- 🧹 **UX Improvements**: Minimalist compact mode ("3 buttons"), auto-hidden debug logs
+- 🌍 **Network**: Added directory creation verification for network shares
+
+### v1.0.9
+- Internal improvements and bug fixes
+
+### v1.0.8
+- Sorted banned extensions alphabetically
+- Fixed JSON parsing error on batch export
+
+### v1.0.6
 
 
 ### v1.0.5

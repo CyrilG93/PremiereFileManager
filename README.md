@@ -72,15 +72,10 @@ The extension will detect files that are used in your project but located outsid
 - 🧹 **UX Improvements**: Minimalist compact mode ("3 buttons"), auto-hidden debug logs
 - 🌍 **Network**: Added directory creation verification for network shares
 
-### v1.0.9
-- Internal improvements and bug fixes
-
 ### v1.0.8
+- ⚙️ **Config**: Moved configuration files to local storage for better management across updates
 - Sorted banned extensions alphabetically
 - Fixed JSON parsing error on batch export
-
-### v1.0.6
-
 
 ### v1.0.5
 - ✅ Added quick language selector with flag emojis in header

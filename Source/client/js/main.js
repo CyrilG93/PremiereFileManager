@@ -898,13 +898,6 @@ async function exportSelected() {
             hideConsolidationProgress();
         }, 1000);
 
-        // Display report
-        displayReport(results);
-        const reportSection = document.getElementById('reportSection');
-        if (reportSection) {
-            reportSection.classList.add('visible');
-        }
-
         const successCount = results.filter(r => r.success).length;
         const skippedCount = results.filter(r => r.skipped).length;
         const errorCount = results.filter(r => !r.success).length;
@@ -1134,9 +1127,6 @@ async function synchronizeFiles() {
                 });
             }
         }
-
-        // Display report
-        displayReport(results);
 
         hideProgress();
         syncBtn.disabled = false;
@@ -1517,13 +1507,6 @@ function importSelected() {
                 importBtn.disabled = false;
                 hideProgress();
                 return;
-            }
-
-            // Display report
-            displayReport(results);
-            const reportSection = document.getElementById('reportSection');
-            if (reportSection) {
-                reportSection.classList.add('visible');
             }
 
             const successCount = results.filter(r => r.success).length;

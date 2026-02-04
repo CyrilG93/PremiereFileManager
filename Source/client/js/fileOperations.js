@@ -5,12 +5,11 @@
 const fs = require('fs');
 const path = require('path');
 
-// Configuration for NAS-optimized file operations
 const FM_COPY_CONFIG = {
-    CHUNK_SIZE: 64 * 1024,           // 64KB chunks (standard Node.js size for better compatibility)
+    CHUNK_SIZE: 256 * 1024,          // 256KB chunks - better balanced for NAS
     MAX_RETRIES: 3,                  // Maximum retry attempts
     RETRY_DELAY_BASE: 1000,          // Base delay for exponential backoff (ms)
-    HIGH_WATER_MARK: 64 * 1024,      // 64KB stream buffer (standard Node.js size)
+    HIGH_WATER_MARK: 256 * 1024,     // 256KB stream buffer - better throughput than 64KB
     DEBUG: true                      // Enable detailed logging
 };
 

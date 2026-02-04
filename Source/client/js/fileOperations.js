@@ -111,7 +111,6 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
         let lastProgressLog = 0;
         const startTime = Date.now();
         let settled = false;  // Prevent double resolve/reject
-        let writeFinished = false;  // Track if write stream finished
 
         const readStream = fs.createReadStream(normalizedSource, {
             highWaterMark: FM_COPY_CONFIG.HIGH_WATER_MARK,
@@ -125,21 +124,24 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
 
         // Helper to check if file was successfully copied
         function verifyAndResolve() {
-            if (settled) return;
+            if (settled) return false;
 
             try {
+                // Give NAS a moment to sync
                 const destStats = fs.statSync(normalizedDest);
                 if (destStats.size === totalSize) {
                     // File copied successfully
                     settled = true;
                     const elapsed = (Date.now() - startTime) / 1000;
                     const speed = elapsed > 0 ? totalSize / elapsed : 0;
-                    fm_debugLog(`[STREAM] DONE: ${fileName} (${fm_formatBytes(speed)}/s)`);
+                    fm_debugLog(`[STREAM] VERIFIED OK: ${fileName} (${fm_formatBytes(speed)}/s)`);
                     resolve({ success: true, size: totalSize });
                     return true;
+                } else {
+                    fm_debugLog(`[STREAM] Size mismatch: expected ${totalSize}, got ${destStats.size}`, 'warning');
                 }
             } catch (e) {
-                // File doesn't exist or can't be read
+                fm_debugLog(`[STREAM] Cannot verify destination: ${e.message}`, 'warning');
             }
             return false;
         }
@@ -162,22 +164,29 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
             }
         });
 
-        // Handle read errors - but check if file was already written
+        // Handle read errors - but check if all data was already read
         readStream.on('error', (err) => {
             if (settled) return;
 
-            // EBADF on close is common on NAS - check if file was successfully written
-            if (err.code === 'EBADF' && writeFinished) {
-                // Small delay then verify the file
+            // EBADF on close after reading all data is OK on NAS
+            // Check if we've read all the bytes
+            if (err.code === 'EBADF' && copiedBytes >= totalSize) {
+                fm_debugLog(`[STREAM] EBADF on close after 100% read, verifying...`);
+                // Wait for NAS to flush writes, then verify
                 setTimeout(() => {
                     if (!verifyAndResolve()) {
-                        settled = true;
-                        fm_debugLog(`[STREAM] READ ERROR after close: ${err.message}`, 'error');
-                        reject(new Error('Read error: ' + err.message));
+                        // Try one more time with longer delay
+                        setTimeout(() => {
+                            if (!verifyAndResolve()) {
+                                settled = true;
+                                fm_debugLog(`[STREAM] Verification failed after EBADF`, 'error');
+                                reject(new Error('Read error: ' + err.message));
+                            }
+                        }, 500);
                     }
-                }, 100);
+                }, 200);
             } else {
-                fm_debugLog(`[STREAM] READ ERROR: ${err.message}`, 'error');
+                fm_debugLog(`[STREAM] READ ERROR at ${Math.round(copiedBytes / totalSize * 100)}%: ${err.message}`, 'error');
                 writeStream.destroy();
                 settled = true;
                 reject(new Error('Read error: ' + err.message));
@@ -188,15 +197,20 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
         writeStream.on('error', (err) => {
             if (settled) return;
 
-            // EBADF on close after finish is OK
-            if (err.code === 'EBADF' && writeFinished) {
+            // EBADF on close after all data written is OK
+            if (err.code === 'EBADF' && copiedBytes >= totalSize) {
+                fm_debugLog(`[STREAM] EBADF on write close after 100%, verifying...`);
                 setTimeout(() => {
                     if (!verifyAndResolve()) {
-                        settled = true;
-                        fm_debugLog(`[STREAM] WRITE ERROR after close: ${err.message}`, 'error');
-                        reject(new Error('Write error: ' + err.message));
+                        setTimeout(() => {
+                            if (!verifyAndResolve()) {
+                                settled = true;
+                                fm_debugLog(`[STREAM] Verification failed after write EBADF`, 'error');
+                                reject(new Error('Write error: ' + err.message));
+                            }
+                        }, 500);
                     }
-                }, 100);
+                }, 200);
             } else {
                 fm_debugLog(`[STREAM] WRITE ERROR: ${err.message}`, 'error');
                 readStream.destroy();
@@ -207,11 +221,10 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
 
         // Success when write completes
         writeStream.on('finish', () => {
-            writeFinished = true;
             // Small delay to let any close errors settle, then verify
             setTimeout(() => {
                 verifyAndResolve();
-            }, 50);
+            }, 100);
         });
 
         // Pipe data from source to destination

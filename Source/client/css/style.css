@@ -1148,7 +1148,7 @@ button svg {
     }
 
     main {
-        padding: 0;
+        padding: 0 !important;
         gap: 0;
     }
 

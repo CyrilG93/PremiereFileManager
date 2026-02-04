@@ -108,20 +108,23 @@
                 </div>
             </div>
 
-            <!-- Debug Section -->
-            <div id="debugSection" class="section hidden" style="margin-top: 16px;">
-                <div class="section-header"
-                    style="padding: 12px; background: var(--bg-secondary); border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;"
-                    onclick="toggleDebugSection()">
-                    <h2 style="margin: 0; font-size: 14px;">🔍 Debug Info</h2>
-                    <span id="debugToggleIcon" style="font-size: 12px; transition: transform 0.2s;">▼</span>
-                </div>
-                <div id="debugContent" class="section-content"
-                    style="padding: 12px; background: var(--bg-secondary); border-radius: 0 0 8px 8px; display: none;">
-                    <div
-                        style="font-family: 'Courier New', monospace; font-size: 11px; white-space: pre-wrap; background: var(--bg-tertiary); padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto; color: var(--text-primary);">
-                        <!-- Debug info will be inserted here -->
+            <!-- Consolidation Progress Section -->
+            <div id="consolidationProgress" class="section hidden" style="margin-top: 16px;">
+                <div class="consolidation-progress-container">
+                    <div class="consolidation-header">
+                        <span class="consolidation-title">📦 Consolidation en cours...</span>
+                        <span id="consolidationStats" class="consolidation-stats">0 / 0 fichiers</span>
                     </div>
+                    <div class="consolidation-bar-container">
+                        <div class="consolidation-bar">
+                            <div id="consolidationBarFill" class="consolidation-bar-fill"></div>
+                        </div>
+                        <span id="consolidationPercent" class="consolidation-percent">0%</span>
+                    </div>
+                    <div id="consolidationCurrentFile" class="consolidation-current-file">
+                        En attente...
+                    </div>
+                    <div id="consolidationSpeed" class="consolidation-speed"></div>
                 </div>
             </div>
 
@@ -292,13 +295,19 @@
         </div>
     </div>
 
-    <!-- Debug Logs Section -->
-    <div id="debugSection" class="section">
-        <div class="section-header">
-            <h3>🐛 Logs de Debug</h3>
-            <button id="clearLogsBtn" class="secondary-btn">Effacer</button>
+    <!-- Debug Logs Section (at bottom) -->
+    <div id="debugLogsSection" class="section debug-logs-section">
+        <div class="debug-logs-header" onclick="toggleDebugLogsSection()">
+            <span>🐛 Debug Logs</span>
+            <div class="debug-header-right">
+                <button id="clearLogsBtn" class="secondary-btn small"
+                    onclick="event.stopPropagation(); clearDebugLogs();">Effacer</button>
+                <span id="debugLogsToggleIcon" class="toggle-icon">▲</span>
+            </div>
         </div>
-        <div id="debugLogs" class="debug-logs"></div>
+        <div id="debugLogsContent" class="debug-logs-content" style="display: none;">
+            <div id="debugLogs" class="debug-logs"></div>
+        </div>
     </div>
 
     <script src="js/CSInterface.js"></script>

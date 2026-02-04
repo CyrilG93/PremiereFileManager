@@ -841,8 +841,8 @@ async function exportSelected() {
     const exportBtn = document.getElementById('exportBtn');
     exportBtn.disabled = true;
 
-    showProgress();
-    updateProgress(0, 'Préparation de l\'export...');
+    // Show consolidation progress section
+    showConsolidationProgress(selectedFiles.length);
 
     try {
         // Prepare file list for copying (same format as old synchronizeFiles)
@@ -852,9 +852,11 @@ async function exportSelected() {
             destination: file.targetPath
         }));
 
+        const startTime = Date.now();
+
         // Use the Node.js copyFiles function from fileOperations.js
         const results = await copyFiles(filesToCopy, (progress) => {
-            updateProgress(progress.percent, `Export ${progress.current}/${progress.total}...`);
+            updateConsolidationProgress(progress.current, progress.total, filesToCopy[progress.current - 1]?.name || '', startTime);
         });
 
         // Ensure results is an array
@@ -865,7 +867,7 @@ async function exportSelected() {
 
         // Relink media in Premiere Pro to point to new location
         if (settings.autoRelink) {
-            updateProgress(100, 'Liaison des médias...');
+            updateConsolidationProgressText('Liaison des médias...');
 
             const relinkList = results
                 .filter(r => r.success && !r.skipped)
@@ -891,8 +893,10 @@ async function exportSelected() {
             }
         }
 
-        updateProgress(100, 'Export terminé');
-        hideProgress();
+        // Hide progress after short delay
+        setTimeout(() => {
+            hideConsolidationProgress();
+        }, 1000);
 
         // Display report
         displayReport(results);
@@ -920,8 +924,60 @@ async function exportSelected() {
         console.error('Export error:', e);
         showStatus('Erreur lors de l\'export: ' + e.message, 'error');
         exportBtn.disabled = false;
-        hideProgress();
+        hideConsolidationProgress();
     }
+}
+
+// Consolidation Progress Functions
+function showConsolidationProgress(totalFiles) {
+    const section = document.getElementById('consolidationProgress');
+    if (section) {
+        section.classList.remove('hidden');
+        updateConsolidationProgress(0, totalFiles, 'Préparation...', Date.now());
+    }
+}
+
+function hideConsolidationProgress() {
+    const section = document.getElementById('consolidationProgress');
+    if (section) {
+        section.classList.add('hidden');
+    }
+}
+
+function updateConsolidationProgress(current, total, currentFileName, startTime) {
+    const barFill = document.getElementById('consolidationBarFill');
+    const percent = document.getElementById('consolidationPercent');
+    const stats = document.getElementById('consolidationStats');
+    const currentFile = document.getElementById('consolidationCurrentFile');
+    const speed = document.getElementById('consolidationSpeed');
+
+    const percentValue = total > 0 ? Math.round((current / total) * 100) : 0;
+
+    if (barFill) barFill.style.width = percentValue + '%';
+    if (percent) percent.textContent = percentValue + '%';
+    if (stats) stats.textContent = `${current} / ${total} fichiers`;
+    if (currentFile) currentFile.textContent = currentFileName || 'En attente...';
+
+    // Calculate speed
+    if (speed && startTime && current > 0) {
+        const elapsed = (Date.now() - startTime) / 1000;
+        const filesPerSecond = current / elapsed;
+        const remaining = total - current;
+        const eta = remaining > 0 ? Math.round(remaining / filesPerSecond) : 0;
+
+        if (eta > 60) {
+            speed.textContent = `~${Math.round(eta / 60)} min restantes`;
+        } else if (eta > 0) {
+            speed.textContent = `~${eta}s restantes`;
+        } else {
+            speed.textContent = 'Finalisation...';
+        }
+    }
+}
+
+function updateConsolidationProgressText(message) {
+    const currentFile = document.getElementById('consolidationCurrentFile');
+    if (currentFile) currentFile.textContent = message;
 }
 
 // Escape HTML
@@ -939,9 +995,10 @@ function debugLog(message, level = 'info') {
     // Try to log to UI if elements exist
     try {
         const debugLogs = document.getElementById('debugLogs');
-        const debugSection = document.getElementById('debugSection');
+        const debugLogsSection = document.getElementById('debugLogsSection');
+        const debugLogsContent = document.getElementById('debugLogsContent');
 
-        if (!debugLogs || !debugSection) return; // Elements don't exist yet
+        if (!debugLogs || !debugLogsSection) return; // Elements don't exist yet
 
         const time = new Date().toLocaleTimeString();
         const logEntry = document.createElement('div');
@@ -955,8 +1012,12 @@ function debugLog(message, level = 'info') {
         debugLogs.appendChild(logEntry);
         debugLogs.scrollTop = debugLogs.scrollHeight;
 
-        // Show debug section
-        debugSection.classList.add('visible');
+        // Show debug section content when there are logs
+        if (debugLogsContent) {
+            debugLogsContent.style.display = 'block';
+            const toggleIcon = document.getElementById('debugLogsToggleIcon');
+            if (toggleIcon) toggleIcon.classList.add('open');
+        }
     } catch (e) {
         // Silently fail if UI logging doesn't work
         console.error('Debug log UI error:', e);
@@ -964,8 +1025,26 @@ function debugLog(message, level = 'info') {
 }
 
 function clearDebugLogs() {
-    document.getElementById('debugLogs').innerHTML = '';
-    document.getElementById('debugSection').classList.remove('visible');
+    const debugLogs = document.getElementById('debugLogs');
+    const debugLogsContent = document.getElementById('debugLogsContent');
+    const toggleIcon = document.getElementById('debugLogsToggleIcon');
+
+    if (debugLogs) debugLogs.innerHTML = '';
+    if (debugLogsContent) debugLogsContent.style.display = 'none';
+    if (toggleIcon) toggleIcon.classList.remove('open');
+}
+
+function toggleDebugLogsSection() {
+    const debugLogsContent = document.getElementById('debugLogsContent');
+    const toggleIcon = document.getElementById('debugLogsToggleIcon');
+
+    if (debugLogsContent) {
+        const isOpen = debugLogsContent.style.display !== 'none';
+        debugLogsContent.style.display = isOpen ? 'none' : 'block';
+        if (toggleIcon) {
+            toggleIcon.classList.toggle('open', !isOpen);
+        }
+    }
 }
 
 // Update file counts

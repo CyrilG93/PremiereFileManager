@@ -110,14 +110,39 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
         let copiedBytes = 0;
         let lastProgressLog = 0;
         const startTime = Date.now();
+        let settled = false;  // Prevent double resolve/reject
+        let writeFinished = false;  // Track if write stream finished
 
         const readStream = fs.createReadStream(normalizedSource, {
-            highWaterMark: FM_COPY_CONFIG.HIGH_WATER_MARK
+            highWaterMark: FM_COPY_CONFIG.HIGH_WATER_MARK,
+            autoClose: true
         });
 
         const writeStream = fs.createWriteStream(normalizedDest, {
-            highWaterMark: FM_COPY_CONFIG.HIGH_WATER_MARK
+            highWaterMark: FM_COPY_CONFIG.HIGH_WATER_MARK,
+            autoClose: true
         });
+
+        // Helper to check if file was successfully copied
+        function verifyAndResolve() {
+            if (settled) return;
+
+            try {
+                const destStats = fs.statSync(normalizedDest);
+                if (destStats.size === totalSize) {
+                    // File copied successfully
+                    settled = true;
+                    const elapsed = (Date.now() - startTime) / 1000;
+                    const speed = elapsed > 0 ? totalSize / elapsed : 0;
+                    fm_debugLog(`[STREAM] DONE: ${fileName} (${fm_formatBytes(speed)}/s)`);
+                    resolve({ success: true, size: totalSize });
+                    return true;
+                }
+            } catch (e) {
+                // File doesn't exist or can't be read
+            }
+            return false;
+        }
 
         // Track progress on data chunks
         readStream.on('data', (chunk) => {
@@ -137,26 +162,56 @@ function fm_copyFileStreaming(source, destination, progressCallback) {
             }
         });
 
-        // Handle read errors
+        // Handle read errors - but check if file was already written
         readStream.on('error', (err) => {
-            fm_debugLog(`[STREAM] READ ERROR: ${err.message}`, 'error');
-            writeStream.destroy();
-            reject(new Error('Read error: ' + err.message));
+            if (settled) return;
+
+            // EBADF on close is common on NAS - check if file was successfully written
+            if (err.code === 'EBADF' && writeFinished) {
+                // Small delay then verify the file
+                setTimeout(() => {
+                    if (!verifyAndResolve()) {
+                        settled = true;
+                        fm_debugLog(`[STREAM] READ ERROR after close: ${err.message}`, 'error');
+                        reject(new Error('Read error: ' + err.message));
+                    }
+                }, 100);
+            } else {
+                fm_debugLog(`[STREAM] READ ERROR: ${err.message}`, 'error');
+                writeStream.destroy();
+                settled = true;
+                reject(new Error('Read error: ' + err.message));
+            }
         });
 
         // Handle write errors (common on NAS disconnects)
         writeStream.on('error', (err) => {
-            fm_debugLog(`[STREAM] WRITE ERROR: ${err.message}`, 'error');
-            readStream.destroy();
-            reject(new Error('Write error: ' + err.message));
+            if (settled) return;
+
+            // EBADF on close after finish is OK
+            if (err.code === 'EBADF' && writeFinished) {
+                setTimeout(() => {
+                    if (!verifyAndResolve()) {
+                        settled = true;
+                        fm_debugLog(`[STREAM] WRITE ERROR after close: ${err.message}`, 'error');
+                        reject(new Error('Write error: ' + err.message));
+                    }
+                }, 100);
+            } else {
+                fm_debugLog(`[STREAM] WRITE ERROR: ${err.message}`, 'error');
+                readStream.destroy();
+                settled = true;
+                reject(new Error('Write error: ' + err.message));
+            }
         });
 
         // Success when write completes
         writeStream.on('finish', () => {
-            const elapsed = (Date.now() - startTime) / 1000;
-            const speed = elapsed > 0 ? totalSize / elapsed : 0;
-            fm_debugLog(`[STREAM] DONE: ${fileName} (${fm_formatBytes(speed)}/s)`);
-            resolve({ success: true, size: totalSize });
+            writeFinished = true;
+            // Small delay to let any close errors settle, then verify
+            setTimeout(() => {
+                verifyAndResolve();
+            }, 50);
         });
 
         // Pipe data from source to destination

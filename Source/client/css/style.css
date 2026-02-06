@@ -1365,3 +1365,49 @@ button svg {
 main {
     padding-bottom: 50px;
 }
+
+/* Update Banner */
+#updateBanner {
+    display: none;
+    background: linear-gradient(135deg, #00c853 0%, #009624 100%);
+    color: white;
+    text-align: center;
+    padding: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    animation: slideDown 0.3s ease-out;
+    margin-bottom: 5px;
+    border-radius: 4px;
+}
+
+#updateBanner:hover {
+    filter: brightness(1.1);
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+/* Version Badge */
+.version-badge {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px;
+    font-weight: normal;
+    vertical-align: middle;
+}

@@ -1887,7 +1887,7 @@ function showUpdateBanner(downloadUrl) {
         banner.style.display = 'block';
 
         // Use translation function
-        banner.textContent = t('updateAvailable');
+        banner.textContent = t('status.updateAvailable');
 
         banner.onclick = function () {
             if (downloadUrl) {

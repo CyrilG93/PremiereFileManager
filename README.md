@@ -19,9 +19,16 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 
 1. Download the latest release from the [Releases](Releases/) folder
 2. Extract the ZIP file
-3. Run `install_macos.sh`
-4. Restart Adobe Premiere Pro
-5. Open the extension: **Window → Extensions → File Manager**
+3. Open Terminal
+4. **Easiest method (recommended):** drag and drop `install_macos.sh` into the Terminal window, then press Enter
+5. **Manual method (command line):** navigate to the extracted folder and run:
+   ```bash
+   cd /path/to/PremiereFileManager
+   chmod +x install_macos.sh
+   ./install_macos.sh
+   ```
+6. Restart Adobe Premiere Pro
+7. Open the extension: **Window → Extensions → File Manager**
 
 ### Windows
 

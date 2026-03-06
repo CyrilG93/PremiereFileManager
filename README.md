@@ -75,7 +75,7 @@ The extension will detect files that are used in your project but located outsid
 
 ## Version History
 
-### v1.2.1 (Unreleased)
+### v1.3.0 (Latest)
 - 🎥 Added camera folder structure handling for import:
   - ARRIRAW
   - RED
@@ -105,8 +105,9 @@ The extension will detect files that are used in your project but located outsid
 - 🪵 Capped debug UI log history to keep memory usage bounded during long sessions
 - 💾 Debounced frequent settings writes and flushes on explicit save
 - 💽 Scan cache is now written only when data actually changed
+- ✅ Auto-import toggle state now persists immediately and is restored on next Premiere launch
 
-### v1.1.0 (Latest)
+### v1.1.0
 - 🚀 **NAS Optimization**: Massive performance boost (up to 20x faster) and reliability fix for network transfers (EBADF)
 - 📊 **Progress UI**: Added detailed consolidation progress bar with real-time speed and ETA
 - 🛡️ **Stability**: Enhanced verification logic for zero-error file transfers

@@ -5,7 +5,7 @@ let currentFiles = [];
 let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
-let CURRENT_VERSION = '1.2.0';
+let CURRENT_VERSION = '1.3.0';
 
 // Deep-merge helper to build locale packs from a shared base dictionary
 function fm_mergeTranslations(base, overrides) {

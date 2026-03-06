@@ -5,6 +5,7 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 ## Features
 
 - 📥 **Smart Import**: Automatically detect and import new files from your project folder
+- 🎥 **Camera Folder Support**: Detect major camera card structures and import only media clips (without recreating full technical folder trees)
 - 📦 **Consolidate**: Organize external files into your project structure (copy files that are outside your project folder)
 - 🔄 **Auto-Import Toggle**: Quick toggle button in header with visual feedback
 - 🔗 **Auto-Relink**: Automatically relink media when files are moved
@@ -71,6 +72,20 @@ The extension will detect files that are used in your project but located outsid
 - **Auto-Import Interval**: How often to scan (in seconds)
 
 ## Version History
+
+### v1.2.1 (Unreleased)
+- 🎥 Added camera folder structure handling for import:
+  - ARRIRAW
+  - RED
+  - AVCHD
+  - Canon XF
+  - Panasonic P2
+  - XDCAM-EX
+  - XDCAM-HD
+  - Sony HDV
+  - Sony a7S
+  - DCIM
+- ✅ Camera imports now keep only the useful media clip and avoid recreating full technical card subfolders in bins
 
 ### v1.1.0 (Latest)
 - 🚀 **NAS Optimization**: Massive performance boost (up to 20x faster) and reliability fix for network transfers (EBADF)

@@ -480,6 +480,223 @@ function FileManager_getProjectInfo(levels) {
 
 // Import-related functions for v2.0
 
+// Split a bin path into clean segments (portable across OS path separators)
+function splitPathSegments(pathValue) {
+    if (!pathValue || pathValue === '') {
+        return [];
+    }
+
+    var normalizedPath = pathValue.replace(/\\/g, '/');
+    var rawSegments = normalizedPath.split('/');
+    var segments = [];
+
+    for (var i = 0; i < rawSegments.length; i++) {
+        if (rawSegments[i] && rawSegments[i] !== '') {
+            segments.push(rawSegments[i]);
+        }
+    }
+
+    return segments;
+}
+
+// Find the first segment index matching a value (case-sensitive, use uppercase inputs)
+function findSegmentIndex(segments, value, startIndex) {
+    var start = (typeof startIndex === 'number' && startIndex >= 0) ? startIndex : 0;
+    for (var i = start; i < segments.length; i++) {
+        if (segments[i] === value) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Find the first segment index starting with a prefix (case-sensitive, use uppercase inputs)
+function findSegmentPrefixIndex(segments, prefix, startIndex) {
+    var start = (typeof startIndex === 'number' && startIndex >= 0) ? startIndex : 0;
+    for (var i = start; i < segments.length; i++) {
+        if (segments[i].indexOf(prefix) === 0) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Find the first segment index ending with a suffix (case-sensitive, use uppercase inputs)
+function findSegmentSuffixIndex(segments, suffix, startIndex) {
+    var start = (typeof startIndex === 'number' && startIndex >= 0) ? startIndex : 0;
+    for (var i = start; i < segments.length; i++) {
+        var segment = segments[i];
+        if (segment.length >= suffix.length &&
+            segment.substring(segment.length - suffix.length) === suffix) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Check if a file extension is in the allowed list
+function isExtensionAllowed(extension, allowedExtensions) {
+    if (!allowedExtensions || allowedExtensions.length === 0) {
+        return true;
+    }
+
+    for (var i = 0; i < allowedExtensions.length; i++) {
+        if (extension === allowedExtensions[i]) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Detect known camera folder structures and return normalized import behavior
+function detectCameraStructure(binPath) {
+    var segments = splitPathSegments(binPath);
+    var upperSegments = [];
+    var i;
+
+    for (i = 0; i < segments.length; i++) {
+        upperSegments.push(segments[i].toUpperCase());
+    }
+
+    var info = {
+        isCameraStructure: false,
+        cameraType: '',
+        normalizedBinPath: binPath || '',
+        allowedExtensions: null
+    };
+
+    if (segments.length === 0) {
+        return info;
+    }
+
+    // AVCHD: /PRIVATE/AVCHD/BDMV/STREAM/*.MTS
+    var idxPrivate = findSegmentIndex(upperSegments, 'PRIVATE');
+    var idxAvchd = findSegmentIndex(upperSegments, 'AVCHD');
+    if (idxPrivate >= 0 && idxAvchd > idxPrivate) {
+        info.isCameraStructure = true;
+        info.cameraType = 'AVCHD';
+        info.normalizedBinPath = segments.slice(0, idxPrivate).join('/');
+        info.allowedExtensions = ['.mts', '.m2ts'];
+        return info;
+    }
+
+    // Sony a7S XAVC: /PRIVATE/M4ROOT/CLIP/*.MP4
+    var idxM4Root = findSegmentIndex(upperSegments, 'M4ROOT');
+    if (idxPrivate >= 0 && idxM4Root > idxPrivate) {
+        info.isCameraStructure = true;
+        info.cameraType = 'Sony a7S';
+        info.normalizedBinPath = segments.slice(0, idxPrivate).join('/');
+        info.allowedExtensions = ['.mp4'];
+        return info;
+    }
+
+    // Canon XF: /CONTENTS/CLIPS001/*.MXF (and CLIPSxxx variants)
+    var idxContents = findSegmentIndex(upperSegments, 'CONTENTS');
+    if (idxContents >= 0) {
+        var idxCanonClips = findSegmentPrefixIndex(upperSegments, 'CLIPS', idxContents + 1);
+        if (idxCanonClips > idxContents) {
+            info.isCameraStructure = true;
+            info.cameraType = 'Canon XF';
+            info.normalizedBinPath = segments.slice(0, idxContents).join('/');
+            info.allowedExtensions = ['.mxf'];
+            return info;
+        }
+
+        // Panasonic P2: /CONTENTS/VIDEO/*.MXF
+        var idxVideo = findSegmentIndex(upperSegments, 'VIDEO', idxContents + 1);
+        if (idxVideo > idxContents) {
+            info.isCameraStructure = true;
+            info.cameraType = 'Panasonic P2';
+            info.normalizedBinPath = segments.slice(0, idxContents).join('/');
+            info.allowedExtensions = ['.mxf'];
+            return info;
+        }
+    }
+
+    // XDCAM-EX: /BPAV/CLPR/.../*.MP4
+    var idxBpav = findSegmentIndex(upperSegments, 'BPAV');
+    if (idxBpav >= 0) {
+        info.isCameraStructure = true;
+        info.cameraType = 'XDCAM-EX';
+        info.normalizedBinPath = segments.slice(0, idxBpav).join('/');
+        info.allowedExtensions = ['.mp4'];
+        return info;
+    }
+
+    // XDCAM-HD: /XDROOT/CLIP/*.MXF
+    var idxXdroot = findSegmentIndex(upperSegments, 'XDROOT');
+    if (idxXdroot >= 0) {
+        info.isCameraStructure = true;
+        info.cameraType = 'XDCAM-HD';
+        info.normalizedBinPath = segments.slice(0, idxXdroot).join('/');
+        info.allowedExtensions = ['.mxf', '.mp4'];
+        return info;
+    }
+
+    // XDCAM-HD legacy structure: /PROAV/CLPR/*.MXF
+    var idxProav = findSegmentIndex(upperSegments, 'PROAV');
+    if (idxProav >= 0) {
+        info.isCameraStructure = true;
+        info.cameraType = 'XDCAM-HD';
+        info.normalizedBinPath = segments.slice(0, idxProav).join('/');
+        info.allowedExtensions = ['.mxf', '.mp4'];
+        return info;
+    }
+
+    // DCIM card structure: /DCIM/xxx/*.MP4|*.MOV
+    var idxDcim = findSegmentIndex(upperSegments, 'DCIM');
+    if (idxDcim >= 0) {
+        info.isCameraStructure = true;
+        info.cameraType = 'DCIM';
+        info.normalizedBinPath = segments.slice(0, idxDcim).join('/');
+        info.allowedExtensions = ['.mp4', '.mov', '.mxf', '.mts', '.m2ts', '.m2t'];
+        return info;
+    }
+
+    // ARRIRAW folder backups: /ARRIRAW/.../*.ARI
+    var idxArriRaw = findSegmentIndex(upperSegments, 'ARRIRAW');
+    if (idxArriRaw >= 0) {
+        info.isCameraStructure = true;
+        info.cameraType = 'ARRIRAW';
+        info.normalizedBinPath = segments.slice(0, idxArriRaw).join('/');
+        info.allowedExtensions = ['.ari'];
+        return info;
+    }
+
+    // RED folder backups: /RED/.../*.R3D, /RDM/... sidecar folders, or *.RDC clip folders
+    var idxRed = findSegmentIndex(upperSegments, 'RED');
+    var idxRdm = findSegmentIndex(upperSegments, 'RDM');
+    var idxRdc = findSegmentSuffixIndex(upperSegments, '.RDC');
+    if (idxRed >= 0 || idxRdm >= 0 || idxRdc >= 0) {
+        var idxRedMarker = idxRed;
+        if (idxRedMarker < 0 || (idxRdm >= 0 && idxRdm < idxRedMarker)) {
+            idxRedMarker = idxRdm;
+        }
+        if (idxRedMarker < 0 || (idxRdc >= 0 && idxRdc < idxRedMarker)) {
+            idxRedMarker = idxRdc;
+        }
+
+        info.isCameraStructure = true;
+        info.cameraType = 'RED';
+        info.normalizedBinPath = segments.slice(0, idxRedMarker).join('/');
+        info.allowedExtensions = ['.r3d'];
+        return info;
+    }
+
+    // Sony HDV folder backups (typically *.M2T)
+    var idxHdv = findSegmentIndex(upperSegments, 'HDV');
+    if (idxHdv >= 0) {
+        info.isCameraStructure = true;
+        info.cameraType = 'Sony HDV';
+        info.normalizedBinPath = segments.slice(0, idxHdv).join('/');
+        info.allowedExtensions = ['.m2t', '.m2ts'];
+        return info;
+    }
+
+    return info;
+}
+
 // Recursively scan folder for all media files
 function scanFolder(folder, fileList, currentPath, bannedExtensions, excludedFolderNames) {
     if (!folder || !folder.exists) return;
@@ -517,7 +734,8 @@ function scanFolder(folder, fileList, currentPath, bannedExtensions, excludedFol
                     }
 
                     // Check if extension is banned
-                    var ext = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+                    var dotIndex = fileName.lastIndexOf('.');
+                    var ext = dotIndex >= 0 ? fileName.substring(dotIndex).toLowerCase() : '';
                     var isBanned = false;
 
                     for (var j = 0; j < bannedExtensions.length; j++) {
@@ -527,11 +745,19 @@ function scanFolder(folder, fileList, currentPath, bannedExtensions, excludedFol
                         }
                     }
 
+                    // Detect known camera structures to flatten technical folders
+                    var cameraInfo = detectCameraStructure(currentPath || '');
+
+                    // In camera folders, import only true media files and skip sidecar/metadata files
+                    if (cameraInfo.isCameraStructure && !isExtensionAllowed(ext, cameraInfo.allowedExtensions)) {
+                        continue;
+                    }
+
                     if (!isBanned && item.exists) {
                         fileList.push({
                             name: fileName,
                             path: decodeURIPath(item.fsName),  // Decode file path
-                            binPath: currentPath || '',
+                            binPath: cameraInfo.isCameraStructure ? cameraInfo.normalizedBinPath : (currentPath || ''),
                             size: item.length || 0,
                             modified: item.modified ? item.modified.getTime() : 0
                         });

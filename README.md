@@ -87,6 +87,9 @@ The extension will detect files that are used in your project but located outsid
   - DCIM
 - ✅ Camera imports now keep only the useful media clip and avoid recreating full technical card subfolders in bins
 - 🌍 Added UI language support for: Deutsch, English, Español, Français, Italiano, Português (Brasil), Русский, 日本語, 简体中文
+- 🛡️ Improved banned-extensions defaults and update migration:
+  - Added common non-importable files (shortcuts, camera sidecars, incompatible image formats)
+  - On update, missing default banned extensions are auto-added without removing user custom extensions
 
 ### v1.1.0 (Latest)
 - 🚀 **NAS Optimization**: Massive performance boost (up to 20x faster) and reliability fix for network transfers (EBADF)
@@ -139,7 +142,7 @@ The extension will detect files that are used in your project but located outsid
 
 ### Files are re-imported after moving project
 
-This should be fixed in v2.20.0+. If you're still experiencing this issue:
+If you're still experiencing this issue:
 1. Click **Analyze**
 2. Open the **Debug Info** section (click to expand)
 3. Check the relative paths being compared
@@ -171,22 +174,13 @@ PremiereFileManager/
 └── Releases/            # Packaged releases
 ```
 
-### Building
-
-To create a new release:
-
-```bash
-cd Source
-zip -r ../Releases/PremiereFileManager-v[VERSION]-Universal.zip . -x "*.DS_Store" -x "__MACOSX/*" -x "*.zip"
-```
-
 ## License
 
 This project is provided as-is for use with Adobe Premiere Pro.
 
 ## Support
 
-For issues, questions, or feature requests, please open an issue on GitHub.
+For issues, questions, or feature requests, please send me a message on Discord.
 
 ## Credits
 

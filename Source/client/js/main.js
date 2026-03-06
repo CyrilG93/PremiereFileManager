@@ -836,32 +836,62 @@ function changeLanguage(lang) {
     }
 }
 
+// Normalize extension list for reliable merge between defaults and user custom values
+function fm_normalizeExtensionList(extensions) {
+    if (!Array.isArray(extensions)) {
+        return [];
+    }
+
+    const normalizedSet = new Set();
+
+    extensions.forEach((ext) => {
+        if (typeof ext !== 'string') {
+            return;
+        }
+
+        const trimmed = ext.trim().toLowerCase();
+        if (trimmed === '') {
+            return;
+        }
+
+        const withDot = trimmed.startsWith('.') ? trimmed : ('.' + trimmed);
+        normalizedSet.add(withDot);
+    });
+
+    return Array.from(normalizedSet).sort();
+}
+
+// Default banned extensions merged with user settings on update
+const FM_DEFAULT_BANNED_EXTENSIONS = fm_normalizeExtensionList([
+    // Archives
+    '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz',
+    // Documents/Data
+    '.pptx', '.ppt', '.docx', '.doc', '.xlsx', '.xls', '.csv', '.pdf', '.txt', '.rtf', '.odt',
+    // Executables
+    '.exe', '.app', '.dmg', '.msi', '.bat', '.sh', '.cmd',
+    // Temporary/System
+    '.tmp', '.temp', '.part', '.download', '.crdownload', '.ini', '.log', '.db', '.cache', '.lnk', '.url',
+    // Premiere/Adobe files
+    '.prproj', '.prlock', '.aep', '.aet', '.mogrt', '.pek', '.cfa', '.xmp', '.edl',
+    // Camera sidecar / metadata files
+    '.cpi', '.bim', '.smi', '.modd', '.moff', '.thm', '.idx',
+    // RAW photo formats (not supported by Premiere video workflows)
+    '.arw', '.cr2', '.cr3', '.nef', '.nrw', '.orf', '.rw2', '.pef', '.raf', '.dng', '.raw',
+    // Other image/design formats usually not wanted for auto-import
+    '.indd', '.eps', '.bmp', '.ico', '.avif', '.heic', '.heif', '.webp',
+    // Audio formats not commonly used in video editing workflows
+    '.flac', '.ape', '.alac', '.wma', '.ogg', '.opus',
+    // Other non-media
+    '.html', '.css', '.js', '.json', '.xml', '.svg', '.md', '.clipchamp', '.ytdl'
+]);
+
 let settings = {
     rootFolder: '',
     rootFolderLevels: 0, // How many parent levels to go up from project file (0 = same folder, 1 = parent, 2 = grandparent)
     autoRelink: true,
     excludedFolders: [],
     excludedFolderNames: ['Premiere Pro Auto-Save', 'Adobe Premiere Pro Auto-Save'],
-    bannedExtensions: [
-        // Archives
-        '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz',
-        // Documents
-        '.pptx', '.ppt', '.docx', '.doc', '.xlsx', '.xls', '.pdf', '.txt', '.rtf', '.odt',
-        // Executables
-        '.exe', '.app', '.dmg', '.msi', '.bat', '.sh', '.cmd',
-        // Temporary/System
-        '.tmp', '.temp', '.part', '.download', '.crdownload', '.ini', '.log', '.db', '.cache',
-        // Premiere/Adobe files
-        '.prproj', '.prlock', '.aep', '.aet', '.pek', '.cfa', '.xmp', '.edl',
-        // RAW photo formats (not supported by Premiere)
-        '.arw', '.cr2', '.cr3', '.nef', '.nrw', '.orf', '.rw2', '.pef', '.raf', '.dng', '.raw',
-        // Other image formats not supported
-        '.indd', '.eps', '.bmp', '.ico', '.avif',
-        // Audio formats not commonly used in video editing
-        '.flac', '.ape', '.alac', '.wma', '.ogg', '.opus',
-        // Other non-media
-        '.html', '.css', '.js', '.json', '.xml', '.svg', '.md', '.clipchamp', '.ytdl', '.part',
-    ],
+    bannedExtensions: FM_DEFAULT_BANNED_EXTENSIONS.slice(),
     autoImport: false,
     autoImportInterval: 30,
     language: 'en' // Default language
@@ -933,6 +963,7 @@ function fm_writeSettingsToFile(settingsData) {
 function loadSettings() {
     let migratedFromLocalStorage = false;
     let loadedSettings = null;
+    let shouldPersistMergedDefaults = false;
 
     // First, try to load from JSON file (persistent across Premiere versions)
     const fileSettings = fm_readSettingsFromFile();
@@ -954,28 +985,18 @@ function loadSettings() {
         }
     }
 
-    // Default banned extensions list (keep in sync with settings object)
-    const defaultBannedExtensions = [
-        '.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz',
-        '.pptx', '.ppt', '.docx', '.doc', '.xlsx', '.xls', '.pdf', '.txt', '.rtf', '.odt',
-        '.exe', '.app', '.dmg', '.msi', '.bat', '.sh', '.cmd',
-        '.tmp', '.temp', '.part', '.download', '.crdownload', '.ini', '.log', '.db', '.cache',
-        '.prproj', '.prlock', '.aep', '.aet', '.mogrt', '.pek', '.cfa', '.xmp', '.edl',
-        '.arw', '.cr2', '.cr3', '.nef', '.nrw', '.orf', '.rw2', '.pef', '.raf', '.dng', '.raw',
-        '.indd', '.eps', '.bmp', '.ico', '.webp',
-        '.flac', '.ape', '.alac', '.wma', '.ogg', '.opus',
-        '.html', '.css', '.js', '.json', '.xml', '.svg', '.md', '.clipchamp', '.ytdl'
-    ];
-
     if (loadedSettings) {
-        // Merge user's custom banned extensions with defaults
-        let mergedBannedExtensions = defaultBannedExtensions;
-        if (loadedSettings.bannedExtensions && Array.isArray(loadedSettings.bannedExtensions)) {
-            const extensionsSet = new Set([
-                ...defaultBannedExtensions,
-                ...loadedSettings.bannedExtensions
-            ]);
-            mergedBannedExtensions = Array.from(extensionsSet);
+        // Merge new defaults with existing user values without removing manual additions
+        const userBannedExtensions = Array.isArray(loadedSettings.bannedExtensions) ? loadedSettings.bannedExtensions : [];
+        const normalizedUserBannedExtensions = fm_normalizeExtensionList(userBannedExtensions);
+        const mergedBannedExtensions = fm_normalizeExtensionList([
+            ...FM_DEFAULT_BANNED_EXTENSIONS,
+            ...normalizedUserBannedExtensions
+        ]);
+
+        // Persist automatically when an update introduced missing default extensions
+        if (mergedBannedExtensions.join('\n') !== normalizedUserBannedExtensions.join('\n')) {
+            shouldPersistMergedDefaults = true;
         }
 
         // Merge saved settings with defaults
@@ -994,7 +1015,7 @@ function loadSettings() {
         }
     } else {
         // First time use - ensure defaults
-        settings.bannedExtensions = defaultBannedExtensions;
+        settings.bannedExtensions = FM_DEFAULT_BANNED_EXTENSIONS.slice();
         console.log('First use: Applied default settings');
 
         // Save defaults to file immediately
@@ -1005,6 +1026,12 @@ function loadSettings() {
     if (migratedFromLocalStorage) {
         fm_writeSettingsToFile(settings);
         console.log('Migration complete: settings saved to persistent file storage');
+    }
+
+    // Save when new defaults were auto-added to existing settings
+    if (shouldPersistMergedDefaults && !migratedFromLocalStorage) {
+        fm_writeSettingsToFile(settings);
+        console.log('Settings updated with new default banned extensions');
     }
 
     // Always sync back to localStorage as backup/legacy support
@@ -1055,12 +1082,10 @@ function saveSettings() {
 
     // Parse banned extensions
     const bannedExtensionsText = document.getElementById('bannedExtensions').value;
-    settings.bannedExtensions = bannedExtensionsText
+    settings.bannedExtensions = fm_normalizeExtensionList(bannedExtensionsText
         .split('\n')
         .map(ext => ext.trim())
-        .filter(ext => ext !== '')
-        .map(ext => ext.startsWith('.') ? ext : '.' + ext) // Ensure dot prefix
-        .sort(); // Sort alphabetically
+        .filter(ext => ext !== ''));
 
     settings.autoImport = document.getElementById('autoImport').checked;
     settings.autoImportInterval = parseInt(document.getElementById('autoImportInterval').value) || 30;

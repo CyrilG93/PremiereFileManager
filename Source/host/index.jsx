@@ -110,10 +110,17 @@ function normalizeComparablePath(pathValue) {
     }
 
     normalized = normalized.replace(/\\/g, '/');
-    normalized = normalized.replace(/\/+/g, '/');
+
+    // Preserve UNC prefix on Windows network paths (//server/share/...)
+    var isUncPath = normalized.indexOf('//') === 0;
+    if (isUncPath) {
+        normalized = '//' + normalized.substring(2).replace(/\/+/g, '/');
+    } else {
+        normalized = normalized.replace(/\/+/g, '/');
+    }
 
     // Normalize Windows drive notations (/c/path, /c:/path -> c:/path)
-    if (IS_WINDOWS) {
+    if (IS_WINDOWS && !isUncPath) {
         if (/^\/[a-zA-Z]\//.test(normalized)) {
             normalized = normalized.charAt(1) + ':/' + normalized.substring(3);
         } else if (/^\/[a-zA-Z]:\//.test(normalized)) {
@@ -122,7 +129,7 @@ function normalizeComparablePath(pathValue) {
     }
 
     // Remove trailing slash for stable comparisons (except "/" and "x:/")
-    if (!/^[a-zA-Z]:\/$/.test(normalized)) {
+    if (!/^[a-zA-Z]:\/$/.test(normalized) && !/^\/\/[^\/]+\/[^\/]+\/?$/.test(normalized)) {
         while (normalized.length > 1 && normalized.charAt(normalized.length - 1) === '/') {
             normalized = normalized.substring(0, normalized.length - 1);
         }
@@ -150,11 +157,13 @@ function getWindowsDriveMappings() {
                 var lines = output.split(/\r?\n/);
                 for (var i = 0; i < lines.length; i++) {
                     var line = lines[i];
-                    // Example: "OK           Z:        \\NAS\\Share      ..."
-                    var match = line.match(/([A-Za-z]:)\s+(\\\\[^\\\r\n]+\\[^\\\r\n]+)/);
+                    // Example: "OK   L:   \\NAS\Share\Folder With Spaces   Microsoft Windows Network"
+                    // Capture UNC path up to the next 2+ spaces separator (or end of line)
+                    var match = line.match(/\b([A-Za-z]:)\s+(\\\\.+?)(?:\s{2,}|\s*$)/);
                     if (match && match[1] && match[2]) {
                         var drive = match[1].toLowerCase();
-                        var uncRoot = normalizeComparablePath(match[2]);
+                        var uncRootRaw = match[2].replace(/\s+$/, '');
+                        var uncRoot = normalizeComparablePath(uncRootRaw);
                         if (uncRoot !== '') {
                             mappings[drive] = uncRoot;
                         }
@@ -622,6 +631,25 @@ function isFileExternal(filePath, projectRoot) {
                 return false; // File is inside project root
             }
         }
+    }
+
+    // Debug aid for NAS/UNC mismatch investigations on Windows
+    if (shouldLogPlatform('debug')) {
+        var sampleFileCandidate = '';
+        var sampleRootCandidate = '';
+        for (var fc in fileCandidates) {
+            if (fileCandidates.hasOwnProperty(fc)) {
+                sampleFileCandidate = fc;
+                break;
+            }
+        }
+        for (var rc in rootCandidates) {
+            if (rootCandidates.hasOwnProperty(rc)) {
+                sampleRootCandidate = rc;
+                break;
+            }
+        }
+        logPlatform('EXTERNAL CHECK: treating as external. file=' + sampleFileCandidate + ' root=' + sampleRootCandidate, 'debug');
     }
 
     return true;

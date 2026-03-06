@@ -32,6 +32,7 @@ const baseTranslations = {
     settings: {
         title: "Settings",
         language: "Language",
+        hostLogLevel: "Host log level",
         rootFolder: "Project Root Folder",
         rootFolderPlaceholder: "Auto-detect",
         rootFolderLevels: "Parent levels from project file",
@@ -831,8 +832,14 @@ function changeLanguage(lang) {
 
         // Save to settings
         settings.language = lang;
-        fm_writeSettingsToFile(settings);
+        fm_writeSettingsToFileDebounced(settings);
         localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
+
+        // Keep both selectors aligned when language changes from either location
+        const langSelect = document.getElementById('languageSelect');
+        const headerLangSelect = document.getElementById('headerLanguageSelect');
+        if (langSelect) langSelect.value = lang;
+        if (headerLangSelect) headerLangSelect.value = lang;
     }
 }
 
@@ -894,8 +901,43 @@ let settings = {
     bannedExtensions: FM_DEFAULT_BANNED_EXTENSIONS.slice(),
     autoImport: false,
     autoImportInterval: 30,
-    language: 'en' // Default language
+    language: 'en', // Default language
+    hostLogLevel: 'info' // Host-side log verbosity sent to ExtendScript
 };
+
+// Accepted host log levels mirrored from ExtendScript host script
+const FM_ALLOWED_HOST_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
+
+function fm_normalizeHostLogLevel(level) {
+    const normalized = (level || '').toString().toLowerCase();
+    return FM_ALLOWED_HOST_LOG_LEVELS.indexOf(normalized) >= 0 ? normalized : 'info';
+}
+
+// Push selected host log level to ExtendScript runtime
+function fm_applyHostLogLevel(level) {
+    const normalized = fm_normalizeHostLogLevel(level);
+    settings.hostLogLevel = normalized;
+
+    csInterface.evalScript(`FileManager_setLogLevel("${normalized}")`, (result) => {
+        if (!result || result === 'EvalScript error.') {
+            console.warn('Host log level update failed:', normalized);
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(result);
+            if (parsed && parsed.success === true) {
+                debugLog(`Host log level: ${parsed.logLevel || normalized}`, 'info');
+            } else if (parsed && parsed.error) {
+                console.warn('Host log level error:', parsed.error);
+            }
+        } catch (e) {
+            console.warn('Host log level parse error:', e);
+        }
+    });
+
+    return normalized;
+}
 
 // ============================================================================
 // FILE-BASED SETTINGS STORAGE (persists across Premiere versions)
@@ -956,6 +998,47 @@ function fm_writeSettingsToFile(settingsData) {
     } catch (e) {
         console.error('Error writing settings file:', e);
         return false;
+    }
+}
+
+// Debounced settings writer to reduce frequent disk writes during auto-import
+let fm_settingsWriteDebounceTimer = null;
+let fm_pendingSettingsWriteData = null;
+const FM_SETTINGS_WRITE_DEBOUNCE_MS = 1500;
+
+function fm_writeSettingsToFileDebounced(settingsData, delayMs = FM_SETTINGS_WRITE_DEBOUNCE_MS) {
+    try {
+        // Keep an immutable snapshot of the latest settings state
+        fm_pendingSettingsWriteData = JSON.parse(JSON.stringify(settingsData));
+    } catch (e) {
+        fm_pendingSettingsWriteData = settingsData;
+    }
+
+    if (fm_settingsWriteDebounceTimer) {
+        clearTimeout(fm_settingsWriteDebounceTimer);
+    }
+
+    fm_settingsWriteDebounceTimer = setTimeout(() => {
+        fm_settingsWriteDebounceTimer = null;
+        if (fm_pendingSettingsWriteData) {
+            fm_writeSettingsToFile(fm_pendingSettingsWriteData);
+            fm_pendingSettingsWriteData = null;
+        }
+    }, delayMs);
+
+    return true;
+}
+
+// Flush debounced write before explicit save actions
+function fm_flushDebouncedSettingsWrite() {
+    if (fm_settingsWriteDebounceTimer) {
+        clearTimeout(fm_settingsWriteDebounceTimer);
+        fm_settingsWriteDebounceTimer = null;
+    }
+
+    if (fm_pendingSettingsWriteData) {
+        fm_writeSettingsToFile(fm_pendingSettingsWriteData);
+        fm_pendingSettingsWriteData = null;
     }
 }
 
@@ -1046,6 +1129,7 @@ function loadSettings() {
     document.getElementById('bannedExtensions').value = (settings.bannedExtensions || []).sort().join('\n');
     document.getElementById('autoImport').checked = settings.autoImport || false;
     document.getElementById('autoImportInterval').value = settings.autoImportInterval || 30;
+    document.getElementById('hostLogLevel').value = fm_normalizeHostLogLevel(settings.hostLogLevel);
 
     // Set language selectors (both header and settings)
     const langSelect = document.getElementById('languageSelect');
@@ -1058,6 +1142,9 @@ function loadSettings() {
     if (headerLangSelect) {
         headerLangSelect.value = currentLangValue;
     }
+
+    // Apply host logging level at startup from persisted settings
+    fm_applyHostLogLevel(settings.hostLogLevel);
 }
 
 // Save settings to persistent storage
@@ -1089,12 +1176,19 @@ function saveSettings() {
 
     settings.autoImport = document.getElementById('autoImport').checked;
     settings.autoImportInterval = parseInt(document.getElementById('autoImportInterval').value) || 30;
+    settings.hostLogLevel = fm_normalizeHostLogLevel(document.getElementById('hostLogLevel').value);
+
+    // Apply host log level immediately so diagnostics follow current configuration
+    fm_applyHostLogLevel(settings.hostLogLevel);
 
     // Handle language change
     const newLang = document.getElementById('languageSelect').value;
     if (newLang !== settings.language) {
         changeLanguage(newLang);
     }
+
+    // Ensure no delayed write remains before explicit save
+    fm_flushDebouncedSettingsWrite();
 
     // Save to persistent file storage
     fm_writeSettingsToFile(settings);
@@ -1158,7 +1252,7 @@ function fm_applySuggestedBannedExtensions(importResults, contextLabel) {
     }
 
     settings.bannedExtensions = merged;
-    fm_writeSettingsToFile(settings);
+    fm_writeSettingsToFileDebounced(settings);
     localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
 
     // Keep settings UI in sync when panel is open
@@ -1674,6 +1768,8 @@ function escapeHtml(text) {
 }
 
 // Debug logging
+const FM_MAX_DEBUG_LOG_ENTRIES = 1000;
+
 function debugLog(message, level = 'info') {
     // Always log to console
     console.log(`[${level}] ${message}`);
@@ -1696,6 +1792,12 @@ function debugLog(message, level = 'info') {
         `;
 
         debugLogs.appendChild(logEntry);
+
+        // Keep debug panel memory usage bounded over long sessions
+        while (debugLogs.children.length > FM_MAX_DEBUG_LOG_ENTRIES) {
+            debugLogs.removeChild(debugLogs.firstChild);
+        }
+
         debugLogs.scrollTop = debugLogs.scrollHeight;
 
         // Don't auto-open the debug panel - let the user control it
@@ -1975,6 +2077,73 @@ function smartSync() {
     }
 }
 
+// Import files in batches to avoid oversized payloads and improve stability
+const FM_IMPORT_BATCH_SIZE = 100;
+
+function fm_chunkArray(items, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+        chunks.push(items.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
+
+function fm_evalScriptPromise(script) {
+    return new Promise((resolve) => {
+        csInterface.evalScript(script, (result) => resolve(result));
+    });
+}
+
+async function fm_importFilesInBatches(filesToImport, options = {}) {
+    const batchSize = options.batchSize || FM_IMPORT_BATCH_SIZE;
+    const contextLabel = options.contextLabel || 'import';
+    const enableSuggestedAutoBan = options.enableSuggestedAutoBan === true;
+    const batches = fm_chunkArray(filesToImport || [], batchSize);
+    const allResults = [];
+    const autoAddedExtensions = new Set();
+
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+        const batch = batches[batchIndex];
+        const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(batch))));
+        const rawResult = await fm_evalScriptPromise(`FileManager_importFilesToProjectBase64('${base64Data}')`);
+
+        let parsed;
+        try {
+            parsed = JSON.parse(rawResult);
+        } catch (e) {
+            throw new Error(`Batch ${batchIndex + 1} parse error: ${e.message}`);
+        }
+
+        if (parsed.error) {
+            throw new Error(parsed.error);
+        }
+
+        const batchResults = Array.isArray(parsed.results) ? parsed.results : [];
+        if (enableSuggestedAutoBan) {
+            const autoAdded = fm_applySuggestedBannedExtensions(batchResults, contextLabel);
+            autoAdded.forEach((ext) => autoAddedExtensions.add(ext));
+        }
+
+        for (let i = 0; i < batchResults.length; i++) {
+            allResults.push(batchResults[i]);
+        }
+
+        if (typeof options.onBatchComplete === 'function') {
+            options.onBatchComplete({
+                batchIndex: batchIndex + 1,
+                totalBatches: batches.length,
+                batchSize: batch.length,
+                results: batchResults
+            });
+        }
+    }
+
+    return {
+        results: allResults,
+        autoAddedExtensions: Array.from(autoAddedExtensions)
+    };
+}
+
 // Compact mode: One-click import (analyze + import all)
 async function compactImport() {
     const compactImportBtn = document.getElementById('compactImportBtn');
@@ -1988,7 +2157,7 @@ async function compactImport() {
     const excludedFolderNames = JSON.stringify(settings.excludedFolderNames || []);
     const importScript = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
 
-    csInterface.evalScript(importScript, (importResult) => {
+    csInterface.evalScript(importScript, async (importResult) => {
         try {
             const importData = JSON.parse(importResult);
             const filesToImport = importData.newFiles || [];
@@ -1998,23 +2167,19 @@ async function compactImport() {
                 return;
             }
 
-            // Import all files
-            const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(filesToImport))));
-            csInterface.evalScript(`FileManager_importFilesToProjectBase64('${base64Data}')`, (result) => {
-                try {
-                    const importData = JSON.parse(result);
-                    const importResults = Array.isArray(importData.results) ? importData.results : [];
-                    const autoAdded = fm_applySuggestedBannedExtensions(importResults, 'compact import');
-
-                    if (autoAdded.length > 0) {
-                        showStatus(`Banlist mise à jour automatiquement: ${autoAdded.join(', ')}`, 'warning');
-                    }
-                } catch (e) {
-                    console.error('Compact import parse error:', e);
-                }
-                compactImportBtn.disabled = false;
+            // Import in batches for better stability on large payloads
+            const importOutcome = await fm_importFilesInBatches(filesToImport, {
+                contextLabel: 'compact import',
+                enableSuggestedAutoBan: false
             });
+
+            if (importOutcome.autoAddedExtensions.length > 0) {
+                showStatus(`Banlist mise à jour automatiquement: ${importOutcome.autoAddedExtensions.join(', ')}`, 'warning');
+            }
+
+            compactImportBtn.disabled = false;
         } catch (e) {
+            console.error('Compact import error:', e);
             compactImportBtn.disabled = false;
         }
     });
@@ -2177,42 +2342,23 @@ function importSelected() {
     showProgress();
     updateProgress(0, 'Import en cours...');
 
-    // Encode to base64 to avoid any escaping issues
-    const filesToImport = JSON.stringify(selectedFiles);
-    const base64Data = btoa(unescape(encodeURIComponent(filesToImport)));
-    debugLog(`Appel ExtendScript avec ${selectedFiles.length} fichiers (base64)`, 'info');
-    debugLog(`Taille base64: ${base64Data.length} caractères`, 'info');
+    debugLog(`Import batché de ${selectedFiles.length} fichier(s)`, 'info');
 
-    csInterface.evalScript(`FileManager_importFilesToProjectBase64('${base64Data}')`, (result) => {
-        debugLog(`ExtendScript a répondu: ${result ? result.substring(0, 100) : 'null'}...`, 'info');
-
+    (async () => {
         try {
-            const data = JSON.parse(result);
+            const importOutcome = await fm_importFilesInBatches(selectedFiles, {
+                contextLabel: 'manual import',
+                enableSuggestedAutoBan: false,
+                onBatchComplete: ({ batchIndex, totalBatches }) => {
+                    debugLog(`Batch import ${batchIndex}/${totalBatches} terminé`, 'info');
+                }
+            });
 
-            if (data.error) {
-                showStatus(data.error, 'error');
-                importBtn.disabled = false;
-                hideProgress();
-                return;
-            }
-
-            // Extract results array from response
-            const results = data.results || [];
-
-            // Ensure results is an array
-            if (!Array.isArray(results)) {
-                console.error('Import did not return an array:', results);
-                showStatus('Erreur: format de réponse invalide', 'error');
-                importBtn.disabled = false;
-                hideProgress();
-                return;
-            }
-
+            const results = importOutcome.results || [];
             const successCount = results.filter(r => r.success).length;
-            const autoAdded = fm_applySuggestedBannedExtensions(results, 'manual import');
 
-            if (autoAdded.length > 0) {
-                showStatus(`${successCount} fichier(s) importé(s). Banlist auto-maj: ${autoAdded.join(', ')}`, 'warning');
+            if (importOutcome.autoAddedExtensions.length > 0) {
+                showStatus(`${successCount} fichier(s) importé(s). Banlist auto-maj: ${importOutcome.autoAddedExtensions.join(', ')}`, 'warning');
             } else {
                 showStatus(`${successCount} fichier(s) importé(s) avec succès`, 'success');
             }
@@ -2222,7 +2368,6 @@ function importSelected() {
 
             // Refresh analysis to update the list
             analyzeAll();
-
         } catch (e) {
             console.error('Import error:', e);
             showStatus('Erreur lors de l\'import: ' + e.message, 'error');
@@ -2232,9 +2377,9 @@ function importSelected() {
             debugLog('Libération du verrou', 'info');
             isImporting = false;
         }
-    });
+    })();
 
-    debugLog('Appel ExtendScript initié, en attente de réponse...', 'info');
+    debugLog('Import par lots initié, en attente des réponses ExtendScript...', 'info');
 }
 
 // Auto-import functionality
@@ -2277,29 +2422,22 @@ function startAutoImport() {
                     const newFiles = data.newFiles || [];
 
                     if (newFiles.length > 0) {
-                        // Import new files
-                        const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(newFiles))));
+                        try {
+                            const importOutcome = await fm_importFilesInBatches(newFiles, {
+                                contextLabel: 'auto import',
+                                enableSuggestedAutoBan: true
+                            });
+                            const successCount = (importOutcome.results || []).filter(r => r.success).length;
+                            console.log(`Auto-import: ${successCount} fichier(s) importé(s)`);
 
-                        csInterface.evalScript(`FileManager_importFilesToProjectBase64('${base64Data}')`, (importResult) => {
-                            try {
-                                const importData = JSON.parse(importResult);
-
-                                if (!importData.error) {
-                                    const importResults = Array.isArray(importData.results) ? importData.results : [];
-                                    const successCount = importResults.filter(r => r.success).length;
-                                    console.log(`Auto-import: ${successCount} fichier(s) importé(s)`);
-
-                                    const autoAdded = fm_applySuggestedBannedExtensions(importResults, 'auto import');
-                                    if (autoAdded.length > 0) {
-                                        console.log(`Auto-import: banlist auto-mise à jour (${autoAdded.join(', ')})`);
-                                    }
-                                }
-                            } catch (e) {
-                                console.error('Auto-import error:', e);
-                            } finally {
-                                isImporting = false;
+                            if (importOutcome.autoAddedExtensions.length > 0) {
+                                console.log(`Auto-import: banlist auto-mise à jour (${importOutcome.autoAddedExtensions.join(', ')})`);
                             }
-                        });
+                        } catch (importError) {
+                            console.error('Auto-import import error:', importError);
+                        } finally {
+                            isImporting = false;
+                        }
                     } else {
                         // No files to import, release lock immediately
                         isImporting = false;
@@ -2434,21 +2572,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Debug
     document.getElementById('clearLogsBtn').addEventListener('click', clearDebugLogs);
-
-    // Language change function
-    function changeLanguage(newLang) {
-        currentLang = newLang;
-        settings.language = newLang;
-        localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
-
-        // Sync both language selectors
-        const langSelect = document.getElementById('languageSelect');
-        const headerLangSelect = document.getElementById('headerLanguageSelect');
-        if (langSelect) langSelect.value = newLang;
-        if (headerLangSelect) headerLangSelect.value = newLang;
-
-        updateUILanguage();
-    }
 
     // Instant language change from settings
     document.getElementById('languageSelect').addEventListener('change', function () {

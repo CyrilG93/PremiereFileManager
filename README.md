@@ -61,7 +61,8 @@ The extension will detect files that are used in your project but located outsid
 
 ## Settings
 
-- **Language**: Quick language selector with flags (🇬🇧/🇫🇷) in header
+- **Language**: Quick language selector in header + full selector in settings
+- **Host Log Level**: Control ExtendScript host verbosity (`debug`, `info`, `warn`, `error`)
 - **Root Folder**: Set the base folder for your project (auto-detected by default)
 - **Root Folder Levels**: Number of parent folders to go up from the .prproj file
 - **Auto-Relink**: Automatically relink media after consolidation
@@ -94,6 +95,14 @@ The extension will detect files that are used in your project but located outsid
 - 🔁 Added advanced deduplication for import candidates (source path + clip signature name/size/mtime)
 - 🚫 Auto-import now suggests auto-banning extension only when host classifies the import failure as incompatible format (not corruption/IO errors)
 - 📦 Reinforced transfer-in-progress protection with stricter file stability checks and extra pass for very recent files
+- 🧠 Replaced filename-only fallback with robust signature fallback (name + size + mtime)
+- ⚙️ Optimized scan filters with O(1) lookup maps for banned extensions and excluded folder names
+- 📚 Added persistent failed-import blacklist file with TTL cleanup across sessions
+- 📦 Added import batching for large auto/manual imports to avoid oversized payloads
+- 📝 Added configurable host log level and connected it to persisted settings
+- 🪵 Capped debug UI log history to keep memory usage bounded during long sessions
+- 💾 Debounced frequent settings writes and flushes on explicit save
+- 💽 Scan cache is now written only when data actually changed
 
 ### v1.1.0 (Latest)
 - 🚀 **NAS Optimization**: Massive performance boost (up to 20x faster) and reliability fix for network transfers (EBADF)

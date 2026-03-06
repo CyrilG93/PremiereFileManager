@@ -106,6 +106,7 @@ The extension will detect files that are used in your project but located outsid
 - 💾 Debounced frequent settings writes and flushes on explicit save
 - 💽 Scan cache is now written only when data actually changed
 - ✅ Auto-import toggle state now persists immediately and is restored on next Premiere launch
+- 🪟 Fixed Windows NAS path normalization for consolidation (avoids false "external file" detection when media is already inside project root)
 
 ### v1.1.0
 - 🚀 **NAS Optimization**: Massive performance boost (up to 20x faster) and reliability fix for network transfers (EBADF)

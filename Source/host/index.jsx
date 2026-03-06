@@ -89,6 +89,110 @@ function normalizePathKey(pathValue) {
     return pathValue.replace(/\\/g, '/').toLowerCase();
 }
 
+// Cache Windows drive mappings (e.g. Z: -> \\NAS\Share) for NAS path normalization
+var FM_WINDOWS_DRIVE_MAP_CACHE = null;
+var FM_WINDOWS_DRIVE_MAP_CACHE_TS = 0;
+var FM_WINDOWS_DRIVE_MAP_CACHE_TTL_MS = 60 * 1000; // Refresh every minute
+
+// Normalize path into a comparable canonical form across slash styles and URI forms
+function normalizeComparablePath(pathValue) {
+    if (!pathValue) {
+        return '';
+    }
+
+    var normalized = decodeURIPath(pathValue.toString());
+
+    // Handle file URI formats if they appear in ExtendScript APIs
+    if (normalized.indexOf('file:///') === 0) {
+        normalized = normalized.substring(8);
+    } else if (normalized.indexOf('file://') === 0) {
+        normalized = normalized.substring(7);
+    }
+
+    normalized = normalized.replace(/\\/g, '/');
+    normalized = normalized.replace(/\/+/g, '/');
+
+    // Normalize Windows drive notations (/c/path, /c:/path -> c:/path)
+    if (IS_WINDOWS) {
+        if (/^\/[a-zA-Z]\//.test(normalized)) {
+            normalized = normalized.charAt(1) + ':/' + normalized.substring(3);
+        } else if (/^\/[a-zA-Z]:\//.test(normalized)) {
+            normalized = normalized.substring(1);
+        }
+    }
+
+    // Remove trailing slash for stable comparisons (except "/" and "x:/")
+    if (!/^[a-zA-Z]:\/$/.test(normalized)) {
+        while (normalized.length > 1 && normalized.charAt(normalized.length - 1) === '/') {
+            normalized = normalized.substring(0, normalized.length - 1);
+        }
+    }
+
+    return normalized.toLowerCase();
+}
+
+// Best-effort retrieval of mapped drive -> UNC mappings on Windows (used for NAS comparisons)
+function getWindowsDriveMappings() {
+    if (!IS_WINDOWS) {
+        return {};
+    }
+
+    var nowMs = new Date().getTime();
+    if (FM_WINDOWS_DRIVE_MAP_CACHE && (nowMs - FM_WINDOWS_DRIVE_MAP_CACHE_TS) < FM_WINDOWS_DRIVE_MAP_CACHE_TTL_MS) {
+        return FM_WINDOWS_DRIVE_MAP_CACHE;
+    }
+
+    var mappings = {};
+    try {
+        if (typeof system !== 'undefined' && system.callSystem) {
+            var output = system.callSystem('cmd.exe /d /c "net use"');
+            if (output && output !== '') {
+                var lines = output.split(/\r?\n/);
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i];
+                    // Example: "OK           Z:        \\NAS\\Share      ..."
+                    var match = line.match(/([A-Za-z]:)\s+(\\\\[^\\\r\n]+\\[^\\\r\n]+)/);
+                    if (match && match[1] && match[2]) {
+                        var drive = match[1].toLowerCase();
+                        var uncRoot = normalizeComparablePath(match[2]);
+                        if (uncRoot !== '') {
+                            mappings[drive] = uncRoot;
+                        }
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        // Ignore mapping lookup failures and fallback to standard normalization
+    }
+
+    FM_WINDOWS_DRIVE_MAP_CACHE = mappings;
+    FM_WINDOWS_DRIVE_MAP_CACHE_TS = nowMs;
+    return mappings;
+}
+
+// Expand a mapped drive path into its UNC equivalent when available
+function expandMappedDriveComparablePath(normalizedPath) {
+    if (!IS_WINDOWS || !normalizedPath) {
+        return '';
+    }
+
+    var driveMatch = normalizedPath.match(/^([a-z]:)(\/.*)?$/);
+    if (!driveMatch) {
+        return '';
+    }
+
+    var drive = driveMatch[1];
+    var rest = driveMatch[2] || '';
+    var mappings = getWindowsDriveMappings();
+    if (!mappings.hasOwnProperty(drive)) {
+        return '';
+    }
+
+    var uncRoot = mappings[drive];
+    return normalizeComparablePath(uncRoot + rest);
+}
+
 // Extract lowercase extension with dot (e.g. ".mp4"), empty string when missing
 function getFileExtension(pathValue) {
     if (!pathValue) {
@@ -471,17 +575,56 @@ function analyzeProject() {
 function isFileExternal(filePath, projectRoot) {
     if (!filePath || !projectRoot) return false;
 
-    // Normalize paths for comparison
-    // Replace backslashes with forward slashes and remove double slashes
-    var normalizedFile = filePath.toLowerCase().replace(/\\/g, '/').replace(/\/\//g, '/');
-    var normalizedRoot = projectRoot.toLowerCase().replace(/\\/g, '/').replace(/\/\//g, '/');
+    // Build candidate comparisons from raw + canonical fsName + mapped-drive expansion
+    var fileCandidates = {};
+    var rootCandidates = {};
 
-    // Ensure root ends with slash for proper comparison
-    if (normalizedRoot.charAt(normalizedRoot.length - 1) !== '/') {
-        normalizedRoot += '/';
+    function addCandidate(map, value) {
+        if (!value || value === '') return;
+        map[value] = true;
     }
 
-    return normalizedFile.indexOf(normalizedRoot) !== 0;
+    var normalizedFile = normalizeComparablePath(filePath);
+    var normalizedRoot = normalizeComparablePath(projectRoot);
+    addCandidate(fileCandidates, normalizedFile);
+    addCandidate(rootCandidates, normalizedRoot);
+
+    // fsName often gives a more canonical path on Windows/NAS
+    try {
+        var fileFsName = normalizeComparablePath((new File(filePath)).fsName);
+        addCandidate(fileCandidates, fileFsName);
+    } catch (e) {
+        // Ignore path canonicalization errors
+    }
+    try {
+        var rootFsName = normalizeComparablePath((new Folder(projectRoot)).fsName);
+        addCandidate(rootCandidates, rootFsName);
+    } catch (e) {
+        // Ignore path canonicalization errors
+    }
+
+    // Add mapped-drive expansions (e.g. z:/project -> /nas/share/project)
+    addCandidate(fileCandidates, expandMappedDriveComparablePath(normalizedFile));
+    addCandidate(rootCandidates, expandMappedDriveComparablePath(normalizedRoot));
+
+    for (var fileCandidate in fileCandidates) {
+        if (!fileCandidates.hasOwnProperty(fileCandidate)) continue;
+
+        for (var rootCandidate in rootCandidates) {
+            if (!rootCandidates.hasOwnProperty(rootCandidate)) continue;
+
+            var rootWithSlash = rootCandidate;
+            if (rootWithSlash.charAt(rootWithSlash.length - 1) !== '/') {
+                rootWithSlash += '/';
+            }
+
+            if (fileCandidate === rootCandidate || fileCandidate.indexOf(rootWithSlash) === 0) {
+                return false; // File is inside project root
+            }
+        }
+    }
+
+    return true;
 }
 
 // Get files that need to be synchronized

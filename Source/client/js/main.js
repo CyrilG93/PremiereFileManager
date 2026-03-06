@@ -1116,6 +1116,61 @@ function saveSettings() {
     closeSettings();
 }
 
+// Auto-add extensions flagged as truly incompatible by host import diagnostics
+function fm_applySuggestedBannedExtensions(importResults, contextLabel) {
+    if (!Array.isArray(importResults) || importResults.length === 0) {
+        return [];
+    }
+
+    const currentBanned = fm_normalizeExtensionList(settings.bannedExtensions || []);
+    const suggested = [];
+
+    importResults.forEach((result) => {
+        if (!result || result.success !== false) {
+            return;
+        }
+
+        // Only add when host explicitly classified as incompatible format
+        if (result.incompatibleFormat !== true) {
+            return;
+        }
+
+        const normalizedSuggestion = fm_normalizeExtensionList([result.suggestedBanExtension || '']);
+        if (normalizedSuggestion.length === 0) {
+            return;
+        }
+
+        suggested.push(normalizedSuggestion[0]);
+    });
+
+    if (suggested.length === 0) {
+        return [];
+    }
+
+    const merged = fm_normalizeExtensionList([
+        ...currentBanned,
+        ...suggested
+    ]);
+
+    const added = merged.filter((ext) => currentBanned.indexOf(ext) === -1);
+    if (added.length === 0) {
+        return [];
+    }
+
+    settings.bannedExtensions = merged;
+    fm_writeSettingsToFile(settings);
+    localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
+
+    // Keep settings UI in sync when panel is open
+    const bannedExtensionsField = document.getElementById('bannedExtensions');
+    if (bannedExtensionsField) {
+        bannedExtensionsField.value = merged.join('\n');
+    }
+
+    debugLog(`Banlist auto-mise à jour (${contextLabel || 'import'}): ${added.join(', ')}`, 'warning');
+    return added;
+}
+
 // Show status message
 function showStatus(message, type = 'success') {
     const statusEl = document.getElementById('statusMessage');
@@ -1946,6 +2001,17 @@ async function compactImport() {
             // Import all files
             const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(filesToImport))));
             csInterface.evalScript(`FileManager_importFilesToProjectBase64('${base64Data}')`, (result) => {
+                try {
+                    const importData = JSON.parse(result);
+                    const importResults = Array.isArray(importData.results) ? importData.results : [];
+                    const autoAdded = fm_applySuggestedBannedExtensions(importResults, 'compact import');
+
+                    if (autoAdded.length > 0) {
+                        showStatus(`Banlist mise à jour automatiquement: ${autoAdded.join(', ')}`, 'warning');
+                    }
+                } catch (e) {
+                    console.error('Compact import parse error:', e);
+                }
                 compactImportBtn.disabled = false;
             });
         } catch (e) {
@@ -2143,7 +2209,13 @@ function importSelected() {
             }
 
             const successCount = results.filter(r => r.success).length;
-            showStatus(`${successCount} fichier(s) importé(s) avec succès`, 'success');
+            const autoAdded = fm_applySuggestedBannedExtensions(results, 'manual import');
+
+            if (autoAdded.length > 0) {
+                showStatus(`${successCount} fichier(s) importé(s). Banlist auto-maj: ${autoAdded.join(', ')}`, 'warning');
+            } else {
+                showStatus(`${successCount} fichier(s) importé(s) avec succès`, 'success');
+            }
 
             importBtn.disabled = false;
             hideProgress();
@@ -2213,8 +2285,14 @@ function startAutoImport() {
                                 const importData = JSON.parse(importResult);
 
                                 if (!importData.error) {
-                                    const successCount = (importData.results || []).filter(r => r.success).length;
+                                    const importResults = Array.isArray(importData.results) ? importData.results : [];
+                                    const successCount = importResults.filter(r => r.success).length;
                                     console.log(`Auto-import: ${successCount} fichier(s) importé(s)`);
+
+                                    const autoAdded = fm_applySuggestedBannedExtensions(importResults, 'auto import');
+                                    if (autoAdded.length > 0) {
+                                        console.log(`Auto-import: banlist auto-mise à jour (${autoAdded.join(', ')})`);
+                                    }
                                 }
                             } catch (e) {
                                 console.error('Auto-import error:', e);

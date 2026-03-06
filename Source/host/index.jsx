@@ -21,6 +21,10 @@ var PLATFORM_CONFIG = {
 // This prevents auto-import from retrying incompatible files in a loop
 var FAILED_IMPORTS_BLACKLIST = {};
 
+// Incremental scan cache settings
+var FM_SCAN_CACHE_VERSION = 1;
+var FM_SCAN_CACHE_FILENAME = '.premiere-file-manager-scan-cache.json';
+
 // Helper function to log platform-specific behavior
 function logPlatform(message) {
     $.writeln('[' + (IS_WINDOWS ? 'WIN' : 'MAC') + '] ' + message);
@@ -36,6 +40,151 @@ function decodeURIPath(path) {
         // If decoding fails, return original path
         return path;
     }
+}
+
+// Normalize any path as a stable lowercase key for lookups/caches
+function normalizePathKey(pathValue) {
+    if (!pathValue) {
+        return '';
+    }
+    return pathValue.replace(/\\/g, '/').toLowerCase();
+}
+
+// Extract lowercase extension with dot (e.g. ".mp4"), empty string when missing
+function getFileExtension(pathValue) {
+    if (!pathValue) {
+        return '';
+    }
+    var normalized = pathValue.replace(/\\/g, '/');
+    var lastSlash = normalized.lastIndexOf('/');
+    var fileName = lastSlash >= 0 ? normalized.substring(lastSlash + 1) : normalized;
+    var lastDot = fileName.lastIndexOf('.');
+    if (lastDot < 0) {
+        return '';
+    }
+    return fileName.substring(lastDot).toLowerCase();
+}
+
+// Return full cache file path inside the project root
+function getScanCacheFilePath(projectRoot) {
+    return projectRoot + '/' + FM_SCAN_CACHE_FILENAME;
+}
+
+// Load incremental scan cache from disk (best effort, safe fallback)
+function loadScanCache(projectRoot) {
+    var defaultCache = {
+        version: FM_SCAN_CACHE_VERSION,
+        root: normalizePathKey(projectRoot),
+        entries: {}
+    };
+
+    try {
+        var cacheFile = new File(getScanCacheFilePath(projectRoot));
+        if (!cacheFile.exists) {
+            return defaultCache;
+        }
+
+        if (!cacheFile.open('r')) {
+            return defaultCache;
+        }
+
+        var content = cacheFile.read();
+        cacheFile.close();
+
+        if (!content || content === '') {
+            return defaultCache;
+        }
+
+        var parsed = JSON.parse(content);
+        if (!parsed || parsed.version !== FM_SCAN_CACHE_VERSION || !parsed.entries) {
+            return defaultCache;
+        }
+
+        return parsed;
+    } catch (e) {
+        return defaultCache;
+    }
+}
+
+// Save incremental scan cache to disk (best effort)
+function saveScanCache(projectRoot, cacheData) {
+    try {
+        var cacheFile = new File(getScanCacheFilePath(projectRoot));
+        if (!cacheFile.open('w')) {
+            return false;
+        }
+
+        cacheFile.write(JSON.stringify(cacheData));
+        cacheFile.close();
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// Classify import errors to decide if extension can be auto-added to banlist
+function isLikelyIncompatibleImportError(errorText) {
+    if (!errorText) {
+        return false;
+    }
+
+    var msg = errorText.toLowerCase();
+
+    // Corruption/IO style errors must NOT trigger extension auto-ban
+    var corruptionOrIoKeywords = [
+        'corrupt',
+        'damaged',
+        'truncated',
+        'incomplete',
+        'end of file',
+        'i/o',
+        'io error',
+        'read error',
+        'permission',
+        'locked',
+        'network',
+        'offline',
+        'not found',
+        'does not exist'
+    ];
+
+    for (var i = 0; i < corruptionOrIoKeywords.length; i++) {
+        if (msg.indexOf(corruptionOrIoKeywords[i]) >= 0) {
+            return false;
+        }
+    }
+
+    // Unsupported-format style errors can trigger extension auto-ban
+    var incompatibleKeywords = [
+        'unsupported',
+        'not supported',
+        'unknown format',
+        'unrecognized format',
+        'invalid format',
+        'not a valid media',
+        'cannot import this file type',
+        'file type is not supported',
+        'importer'
+    ];
+
+    for (var j = 0; j < incompatibleKeywords.length; j++) {
+        if (msg.indexOf(incompatibleKeywords[j]) >= 0) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+// Build extension auto-ban suggestion details from an import error
+function getImportFailureInfo(filePath, errorText) {
+    var ext = getFileExtension(filePath);
+    var incompatibleFormat = ext !== '' && isLikelyIncompatibleImportError(errorText);
+
+    return {
+        incompatibleFormat: incompatibleFormat,
+        suggestedBanExtension: incompatibleFormat ? ext : ''
+    };
 }
 
 // Get current project path
@@ -777,8 +926,24 @@ function scanFolder(folder, fileList, currentPath, bannedExtensions, excludedFol
 // Check if file is stable (not being copied/written)
 // This is critical for auto-import to avoid importing incomplete files
 // Uses platform-specific configuration for optimal behavior
+function isLikelyTransferTempName(filePath) {
+    var normalized = filePath ? filePath.toLowerCase() : '';
+    return normalized.indexOf('.crdownload') >= 0 ||
+        normalized.indexOf('.download') >= 0 ||
+        normalized.indexOf('.filepart') >= 0 ||
+        normalized.indexOf('.partial') >= 0 ||
+        normalized.indexOf('.part') >= 0 ||
+        normalized.indexOf('.tmp') >= 0;
+}
+
 function isFileStable(filePath) {
     try {
+        // Transfer-temp filenames should never be imported
+        if (isLikelyTransferTempName(filePath)) {
+            logPlatform('File looks like a transfer-temp file: ' + filePath);
+            return false;
+        }
+
         // Check 1: Try to open file exclusively (detects if file is locked)
         var testFile = new File(filePath);
         if (!testFile.exists) {
@@ -806,11 +971,12 @@ function isFileStable(filePath) {
             return false;
         }
 
-        // Quick check: if file is older than 10 seconds, it's probably stable
-        // This avoids waiting for files that are already complete
+        // Longer age threshold: only trust very old files immediately
+        // This avoids importing files that are still transferring on slow NAS links
         var now = new Date().getTime();
         var fileAge = now - modified1;
-        if (fileAge > 10000) { // 10 seconds old
+        var oldEnoughThreshold = IS_WINDOWS ? 180000 : 120000; // 3 min Win, 2 min Mac
+        if (fileAge > oldEnoughThreshold) {
             logPlatform('File old enough, assuming stable: ' + filePath);
             return true;
         }
@@ -844,6 +1010,33 @@ function isFileStable(filePath) {
             return false;
         }
         testFile.close();
+
+        // Extra pass for very recent files to avoid importing while transfer still finalizing
+        var veryRecentThreshold = IS_WINDOWS ? 60000 : 45000; // 60s Win, 45s Mac
+        if (fileAge <= veryRecentThreshold) {
+            logPlatform('File very recent, running extra stability pass: ' + filePath);
+            $.sleep(PLATFORM_CONFIG.fileStabilityWait);
+
+            testFile = new File(filePath);
+            if (!testFile.exists) {
+                return false;
+            }
+
+            var size3 = testFile.length;
+            var modified3 = testFile.modified ? testFile.modified.getTime() : 0;
+
+            if (size2 !== size3 || modified2 !== modified3) {
+                logPlatform('File changed during extra pass: ' + filePath);
+                return false;
+            }
+
+            canOpen = testFile.open(PLATFORM_CONFIG.fileOpenMode);
+            if (!canOpen) {
+                logPlatform('File locked on extra pass: ' + filePath);
+                return false;
+            }
+            testFile.close();
+        }
 
         // All checks passed, file is stable
         logPlatform('File stable: ' + filePath);
@@ -1034,19 +1227,68 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
         logPlatform('Total project files: ' + projectFiles.length);
         logPlatform('========================================');
 
-        // Create a lookup object with relative paths for faster comparison
+        // Create lookup objects for faster comparison
         var projectFilePaths = {};
-        for (var i = 0; i < projectFiles.length; i++) {
-            var relativePath = projectFiles[i];
-            if (relativePath && relativePath !== '') {
-                projectFilePaths[relativePath] = true;
+        var projectFileNames = {};
+        for (var p = 0; p < projectFiles.length; p++) {
+            var projectRelativePath = projectFiles[p];
+            if (projectRelativePath && projectRelativePath !== '') {
+                projectFilePaths[projectRelativePath] = true;
+
+                // Keep a filename lookup for cross-root comparisons
+                var projectFileName = projectRelativePath.substring(projectRelativePath.lastIndexOf('/') + 1);
+                if (projectFileName && projectFileName !== '') {
+                    projectFileNames[projectFileName] = true;
+                }
             }
+        }
+
+        // Load incremental cache for scan decisions
+        var scanCache = loadScanCache(projectRoot);
+        if (!scanCache.entries) {
+            scanCache.entries = {};
+        }
+        var scanCacheEntries = scanCache.entries;
+        var scanStamp = new Date().getTime();
+
+        // Stats for diagnostics
+        var cacheHits = 0;
+        var stableChecks = 0;
+        var stableChecksSkipped = 0;
+        var dedupeSkippedByPath = 0;
+        var dedupeSkippedBySignature = 0;
+
+        // Dedup trackers for this scan batch
+        var newFilesByPath = {};
+        var newFilesBySignature = {};
+
+        // Update one cache row consistently
+        function updateScanCacheEntry(cacheKey, fingerprint, relativePath, decision, stableValue, fileData) {
+            scanCacheEntries[cacheKey] = {
+                fingerprint: fingerprint,
+                relativePath: relativePath,
+                decision: decision,
+                stable: stableValue === true,
+                size: fileData.size || 0,
+                modified: fileData.modified || 0,
+                binPath: fileData.binPath || '',
+                lastSeen: scanStamp
+            };
         }
 
         // Find new files
         var newFiles = [];
         for (var i = 0; i < scannedFiles.length; i++) {
             var file = scannedFiles[i];
+            var normalizedAbsolutePath = normalizePathKey(file.path);
+            var relativeFilePath = getRelativePath(file.path, projectRoot);
+            var fingerprint = (file.size || 0) + '|' + (file.modified || 0) + '|' + (file.binPath || '');
+            var cacheEntry = scanCacheEntries[normalizedAbsolutePath];
+            var cacheHit = cacheEntry && cacheEntry.fingerprint === fingerprint;
+
+            if (cacheHit) {
+                cacheHits++;
+            }
 
             // Check if in excluded folder
             var isExcluded = false;
@@ -1061,10 +1303,10 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
                 }
             }
 
-            if (isExcluded) continue;
-
-            // Convert to relative path for comparison (portable across computers)
-            var relativeFilePath = getRelativePath(file.path, projectRoot);
+            if (isExcluded) {
+                updateScanCacheEntry(normalizedAbsolutePath, fingerprint, relativeFilePath, 'excluded', false, file);
+                continue;
+            }
 
             // Debug: Log conversion and comparison
             logPlatform('SCANNED FILE: ' + file.path + ' -> ' + relativeFilePath);
@@ -1076,15 +1318,16 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
             // This handles cases where files were outside project root on PC but inside on Mac
             if (!alreadyInProject) {
                 var filename = relativeFilePath.substring(relativeFilePath.lastIndexOf('/') + 1);
-                alreadyInProject = projectFilePaths[filename] === true;
+                alreadyInProject = projectFileNames[filename] === true;
 
                 if (alreadyInProject) {
                     logPlatform('✓ MATCH (by filename): ' + filename);
                 }
             }
 
-            // Also check blacklist using relative path
-            var isBlacklisted = FAILED_IMPORTS_BLACKLIST[relativeFilePath] === true;
+            // Check blacklist with normalized absolute path and legacy relative key
+            var isBlacklisted = FAILED_IMPORTS_BLACKLIST[normalizedAbsolutePath] === true ||
+                FAILED_IMPORTS_BLACKLIST[relativeFilePath] === true;
 
             // Debug: Log comparison result
             if (alreadyInProject) {
@@ -1097,12 +1340,67 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
                 logPlatform('BLACKLIST CHECK: File is blacklisted: ' + relativeFilePath);
             }
 
-            if (!alreadyInProject && !isBlacklisted && isFileStable(file.path)) {
-                newFiles.push(file);
-            } else if (isBlacklisted) {
+            if (alreadyInProject) {
+                updateScanCacheEntry(normalizedAbsolutePath, fingerprint, relativeFilePath, 'in_project', false, file);
+                continue;
+            }
+
+            if (isBlacklisted) {
                 logPlatform('Skipping blacklisted file: ' + relativeFilePath);
+                updateScanCacheEntry(normalizedAbsolutePath, fingerprint, relativeFilePath, 'blacklisted', false, file);
+                continue;
+            }
+
+            // Cache hit with previously stable file can skip expensive stability re-check
+            var stable = false;
+            if (cacheHit && cacheEntry.stable === true && cacheEntry.decision === 'stable') {
+                stable = true;
+                stableChecksSkipped++;
+            } else {
+                stableChecks++;
+                stable = isFileStable(file.path);
+            }
+
+            if (!stable) {
+                updateScanCacheEntry(normalizedAbsolutePath, fingerprint, relativeFilePath, 'unstable', false, file);
+                continue;
+            }
+
+            // Advanced dedup #1: same absolute source path should only appear once
+            if (newFilesByPath[normalizedAbsolutePath] === true) {
+                dedupeSkippedByPath++;
+                updateScanCacheEntry(normalizedAbsolutePath, fingerprint, relativeFilePath, 'dedupe_path', true, file);
+                continue;
+            }
+
+            // Advanced dedup #2: same clip signature (name+size+mtime) should only appear once
+            var dedupeSignature = (file.name || '').toLowerCase() + '|' + (file.size || 0) + '|' + (file.modified || 0);
+            if (newFilesBySignature[dedupeSignature] === true) {
+                dedupeSkippedBySignature++;
+                updateScanCacheEntry(normalizedAbsolutePath, fingerprint, relativeFilePath, 'dedupe_signature', true, file);
+                continue;
+            }
+
+            newFilesByPath[normalizedAbsolutePath] = true;
+            newFilesBySignature[dedupeSignature] = true;
+            newFiles.push(file);
+            updateScanCacheEntry(normalizedAbsolutePath, fingerprint, relativeFilePath, 'stable', true, file);
+        }
+
+        // Remove stale cache rows for files no longer present in project root
+        var removedCacheEntries = 0;
+        for (var cacheKey in scanCacheEntries) {
+            if (scanCacheEntries.hasOwnProperty(cacheKey)) {
+                if (scanCacheEntries[cacheKey].lastSeen !== scanStamp) {
+                    delete scanCacheEntries[cacheKey];
+                    removedCacheEntries++;
+                }
             }
         }
+
+        scanCache.version = FM_SCAN_CACHE_VERSION;
+        scanCache.root = normalizePathKey(projectRoot);
+        var cacheSaved = saveScanCache(projectRoot, scanCache);
 
         return JSON.stringify({
             projectRoot: projectRoot,
@@ -1112,6 +1410,13 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
                 projectRoot: projectRoot,
                 totalScanned: scannedFiles.length,
                 totalInProject: projectFiles.length,
+                cacheHits: cacheHits,
+                stableChecks: stableChecks,
+                stableChecksSkipped: stableChecksSkipped,
+                dedupeSkippedByPath: dedupeSkippedByPath,
+                dedupeSkippedBySignature: dedupeSkippedBySignature,
+                removedCacheEntries: removedCacheEntries,
+                cacheSaved: cacheSaved,
                 sampleProjectFiles: projectFiles.slice(0, 3), // First 3 files in project (relative paths)
                 sampleScannedFiles: (function () {
                     var samples = [];
@@ -1182,6 +1487,8 @@ function FileManager_importFilesToProject(filesJson) {
                     results.push({
                         name: file.name,
                         success: false,
+                        incompatibleFormat: false,
+                        suggestedBanExtension: '',
                         error: 'Source file does not exist: ' + file.path
                     });
                     continue;
@@ -1203,14 +1510,20 @@ function FileManager_importFilesToProject(filesJson) {
 
                 // Check if import failed
                 if (importError) {
+                    var importErrorText = importError.toString();
+                    var failureInfo = getImportFailureInfo(file.path, importErrorText);
+
                     // Import failed - add to blacklist to prevent retry loops
-                    var normalizedPath = file.path.replace(/\\/g, '/').toLowerCase();
+                    var normalizedPath = normalizePathKey(file.path);
                     FAILED_IMPORTS_BLACKLIST[normalizedPath] = true;
 
                     // Debug: Log blacklist addition and current state
                     logPlatform('BLACKLIST ADD: Added to blacklist: ' + file.path);
                     logPlatform('BLACKLIST ADD: Normalized path: ' + normalizedPath);
-                    logPlatform('BLACKLIST ADD: Error was: ' + importError.toString());
+                    logPlatform('BLACKLIST ADD: Error was: ' + importErrorText);
+                    if (failureInfo.incompatibleFormat) {
+                        logPlatform('BLACKLIST EXTENSION SUGGESTION: ' + failureInfo.suggestedBanExtension);
+                    }
 
                     // Count blacklist entries
                     var blacklistCount = 0;
@@ -1224,7 +1537,9 @@ function FileManager_importFilesToProject(filesJson) {
                     results.push({
                         name: file.name,
                         success: false,
-                        error: importError.toString()
+                        incompatibleFormat: failureInfo.incompatibleFormat,
+                        suggestedBanExtension: failureInfo.suggestedBanExtension,
+                        error: importErrorText
                     });
                 } else if (importedItems && importedItems.length > 0) {
                     // Import succeeded with items
@@ -1243,15 +1558,19 @@ function FileManager_importFilesToProject(filesJson) {
                 }
             } catch (e) {
                 // Outer catch for any other errors (file access, etc.)
-                var normalizedPath = file.path.replace(/\\/g, '/').toLowerCase();
+                var outerErrorText = e.toString();
+                var outerFailureInfo = getImportFailureInfo(file.path, outerErrorText);
+                var normalizedPath = normalizePathKey(file.path);
                 FAILED_IMPORTS_BLACKLIST[normalizedPath] = true;
 
-                logPlatform('Import error, added to blacklist: ' + file.path + ' - ' + e.toString());
+                logPlatform('Import error, added to blacklist: ' + file.path + ' - ' + outerErrorText);
 
                 results.push({
                     name: file.name,
                     success: false,
-                    error: e.toString()
+                    incompatibleFormat: outerFailureInfo.incompatibleFormat,
+                    suggestedBanExtension: outerFailureInfo.suggestedBanExtension,
+                    error: outerErrorText
                 });
             }
         }

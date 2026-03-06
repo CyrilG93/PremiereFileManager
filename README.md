@@ -10,7 +10,7 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 - 🔄 **Auto-Import Toggle**: Quick toggle button in header with visual feedback
 - 🔗 **Auto-Relink**: Automatically relink media when files are moved
 - 🚫 **File Filtering**: Exclude specific file types and folders
-- 🌍 **Multi-language**: Support for English and French with instant language switch
+- 🌍 **Multi-language**: Support for Deutsch, English, Español, Français, Italiano, Português (Brasil), Русский, 日本語 and 简体中文 with instant language switch
 - 🎨 **Responsive UI**: Adapts to different panel sizes with compact mode
 - 🔍 **Debug Mode**: Built-in diagnostics for troubleshooting
 
@@ -86,6 +86,7 @@ The extension will detect files that are used in your project but located outsid
   - Sony a7S
   - DCIM
 - ✅ Camera imports now keep only the useful media clip and avoid recreating full technical card subfolders in bins
+- 🌍 Added UI language support for: Deutsch, English, Español, Français, Italiano, Português (Brasil), Русский, 日本語, 简体中文
 
 ### v1.1.0 (Latest)
 - 🚀 **NAS Optimization**: Massive performance boost (up to 20x faster) and reliability fix for network transfers (EBADF)
@@ -189,4 +190,4 @@ For issues, questions, or feature requests, please open an issue on GitHub.
 
 ## Credits
 
-Developed by Cyril G.
+Developed by CyrilG93.

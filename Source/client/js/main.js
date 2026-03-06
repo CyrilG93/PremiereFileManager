@@ -7,91 +7,277 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 let CURRENT_VERSION = '1.2.0';
 
+// Deep-merge helper to build locale packs from a shared base dictionary
+function fm_mergeTranslations(base, overrides) {
+    const result = Array.isArray(base) ? base.slice() : { ...base };
+    if (!overrides || typeof overrides !== 'object') {
+        return result;
+    }
+
+    Object.keys(overrides).forEach((key) => {
+        const overrideValue = overrides[key];
+        if (overrideValue && typeof overrideValue === 'object' && !Array.isArray(overrideValue)) {
+            const baseValue = base && typeof base[key] === 'object' ? base[key] : {};
+            result[key] = fm_mergeTranslations(baseValue, overrideValue);
+        } else {
+            result[key] = overrideValue;
+        }
+    });
+
+    return result;
+}
+
 // Embedded translations (no async loading to avoid initialization issues)
+const baseTranslations = {
+    settings: {
+        title: "Settings",
+        language: "Language",
+        rootFolder: "Project Root Folder",
+        rootFolderPlaceholder: "Auto-detect",
+        rootFolderLevels: "Parent levels from project file",
+        rootFolderLevelsHelp: "How many levels up from the project file folder (0 = same folder, 1 = parent, 2 = grandparent)",
+        autoRelink: "Auto-relink media after consolidation",
+        autoImport: "Auto-import",
+        autoImportInterval: "Auto-import interval (seconds)",
+        excludedFolders: "Folders excluded from consolidation",
+        excludedFoldersPlaceholder: "Ex: TEMP, CACHE, BACKUP\nOne folder per line",
+        excludedFolderNames: "Folder names to ignore on import",
+        excludedFolderNamesPlaceholder: "Ex: node_modules, .git, Thumbs.db",
+        bannedExtensions: "File extensions banned from import",
+        bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nOne extension per line"
+    },
+    buttons: {
+        analyze: "Analyze",
+        import: "Import",
+        export: "Consolidate",
+        selectAll: "All",
+        deselectAll: "None",
+        save: "Save",
+        selectAllImport: "All",
+        deselectAllImport: "None",
+        selectAllExport: "All",
+        deselectAllExport: "None"
+    },
+    compact: {
+        import: "Import",
+        export: "Consolidate"
+    },
+    labels: {
+        project: "Project:",
+        rootFolder: "Root folder:",
+        current: "Current:",
+        target: "Target:",
+        bin: "Bin:",
+        binDefault: "Root",
+        offline: "offline"
+    },
+    results: {
+        importTitle: "Files to Import",
+        exportTitle: "Files to Consolidate",
+        emptyImport: "No new files to import",
+        emptyExport: "All files are consolidated",
+        importSubtitle: "From folder → Premiere Pro",
+        exportSubtitle: "From Premiere Pro → folder",
+        importButton: "Import",
+        exportButton: "Consolidate"
+    },
+    report: {
+        title: "Consolidation Report",
+        success: "Success",
+        skipped: "Skipped (already exists)",
+        failed: "Failed"
+    },
+    status: {
+        analyzing: "Analyzing project...",
+        searching: "Searching for new files...",
+        importing: "Importing files...",
+        exporting: "Consolidating files...",
+        relinking: "Relinking media...",
+        completed: "Operation completed",
+        saved: "Settings saved",
+        noNewFiles: "No new files to import",
+        allSynced: "All files are consolidated",
+        filesDetected: "file(s) detected",
+        newFilesDetected: "new file(s) detected",
+        filesImported: "file(s) imported successfully",
+        filesExported: "file(s) consolidated successfully",
+        autoImportStarted: "Auto-import started with interval",
+        autoImportStopped: "Auto-import stopped",
+        selectFolder: "Please select a root folder first",
+        toImport: "to import",
+        toExport: "to consolidate",
+        noFilesToSync: "No files to synchronize",
+        updateAvailable: "🚀 New version available! Click to update."
+    }
+};
+
 const translations = {
-    en: {
+    en: baseTranslations,
+    de: fm_mergeTranslations(baseTranslations, {
         settings: {
-            title: "Settings",
-            language: "Language",
-            rootFolder: "Project Root Folder",
-            rootFolderPlaceholder: "Auto-detect",
-            rootFolderLevels: "Parent levels from project file",
-            rootFolderLevelsHelp: "How many levels up from the project file folder (0 = same folder, 1 = parent, 2 = grandparent)",
-            autoRelink: "Auto-relink media after consolidation",
-            autoImport: "Auto-import",
-            autoImportInterval: "Auto-import interval (seconds)",
-            excludedFolders: "Folders excluded from consolidation",
-            excludedFoldersPlaceholder: "Ex: TEMP, CACHE, BACKUP\nOne folder per line",
-            excludedFolderNames: "Folder names to ignore on import",
-            excludedFolderNamesPlaceholder: "Ex: node_modules, .git, Thumbs.db",
-            bannedExtensions: "File extensions banned from import",
-            bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nOne extension per line"
+            title: "Einstellungen",
+            language: "Sprache",
+            rootFolder: "Projekt-Stammordner",
+            rootFolderPlaceholder: "Automatisch erkennen",
+            rootFolderLevels: "Übergeordnete Ebenen ab Projektdatei",
+            rootFolderLevelsHelp: "Wie viele Ebenen oberhalb des Projektdatei-Ordners verwendet werden (0 = gleicher Ordner, 1 = Elternordner, 2 = Großelternordner)",
+            autoRelink: "Medien nach Konsolidierung automatisch neu verknüpfen",
+            autoImport: "Automatischer Import",
+            autoImportInterval: "Intervall für automatischen Import (Sekunden)",
+            excludedFolders: "Von der Konsolidierung ausgeschlossene Ordner",
+            excludedFoldersPlaceholder: "Bsp: TEMP, CACHE, BACKUP\nEin Ordner pro Zeile",
+            excludedFolderNames: "Beim Import zu ignorierende Ordnernamen",
+            excludedFolderNamesPlaceholder: "Bsp: node_modules, .git, Thumbs.db",
+            bannedExtensions: "Vom Import ausgeschlossene Dateiendungen",
+            bannedExtensionsPlaceholder: "Bsp: .zip, .pptx, .exe\nEine Endung pro Zeile"
         },
         buttons: {
-            analyze: "Analyze",
-            import: "Import",
-            export: "Consolidate",
-            selectAll: "All",
-            deselectAll: "None",
-            save: "Save",
-            selectAllImport: "All",
-            deselectAllImport: "None",
-            selectAllExport: "All",
-            deselectAllExport: "None"
+            analyze: "Analysieren",
+            import: "Importieren",
+            export: "Konsolidieren",
+            selectAll: "Alle",
+            deselectAll: "Keine",
+            save: "Speichern",
+            selectAllImport: "Alle",
+            deselectAllImport: "Keine",
+            selectAllExport: "Alle",
+            deselectAllExport: "Keine"
         },
         compact: {
-            import: "Import",
-            export: "Consolidate"
+            import: "Importieren",
+            export: "Konsolidieren"
         },
         labels: {
-            project: "Project:",
-            rootFolder: "Root folder:",
-            current: "Current:",
-            target: "Target:",
+            project: "Projekt:",
+            rootFolder: "Stammordner:",
+            current: "Aktuell:",
+            target: "Ziel:",
             bin: "Bin:",
-            binDefault: "Root",
+            binDefault: "Stamm",
             offline: "offline"
         },
         results: {
-            importTitle: "Files to Import",
-            exportTitle: "Files to Consolidate",
-            emptyImport: "No new files to import",
-            emptyExport: "All files are consolidated",
-            importSubtitle: "From folder → Premiere Pro",
-            exportSubtitle: "From Premiere Pro → folder",
-            importButton: "Import",
-            exportButton: "Consolidate"
+            importTitle: "Dateien zum Import",
+            exportTitle: "Dateien zur Konsolidierung",
+            emptyImport: "Keine neuen Dateien zum Import",
+            emptyExport: "Alle Dateien sind konsolidiert",
+            importSubtitle: "Aus Ordner → Premiere Pro",
+            exportSubtitle: "Von Premiere Pro → Ordner",
+            importButton: "Importieren",
+            exportButton: "Konsolidieren"
         },
         report: {
-            title: "Consolidation Report",
-            success: "Success",
-            skipped: "Skipped (already exists)",
-            failed: "Failed"
+            title: "Konsolidierungsbericht",
+            success: "Erfolg",
+            skipped: "Übersprungen (bereits vorhanden)",
+            failed: "Fehlgeschlagen"
         },
         status: {
-            analyzing: "Analyzing project...",
-            searching: "Searching for new files...",
-            importing: "Importing files...",
-            exporting: "Consolidating files...",
-            relinking: "Relinking media...",
-            completed: "Operation completed",
-            saved: "Settings saved",
-            noNewFiles: "No new files to import",
-            allSynced: "All files are consolidated",
-            filesDetected: "file(s) detected",
-            newFilesDetected: "new file(s) detected",
-            filesImported: "file(s) imported successfully",
-            filesExported: "file(s) consolidated successfully",
-            autoImportStarted: "Auto-import started with interval",
-            autoImportStopped: "Auto-import stopped",
-            selectFolder: "Please select a root folder first",
-            toImport: "to import",
-            toExport: "to consolidate",
-            noFilesToSync: "No files to synchronize",
-            updateAvailable: "🚀 New version available! Click to update."
+            analyzing: "Projekt wird analysiert...",
+            searching: "Suche nach neuen Dateien...",
+            importing: "Dateien werden importiert...",
+            exporting: "Dateien werden konsolidiert...",
+            relinking: "Medien werden neu verknüpft...",
+            completed: "Vorgang abgeschlossen",
+            saved: "Einstellungen gespeichert",
+            noNewFiles: "Keine neuen Dateien zum Import",
+            allSynced: "Alle Dateien sind konsolidiert",
+            filesDetected: "Datei(en) erkannt",
+            newFilesDetected: "neue Datei(en) erkannt",
+            filesImported: "Datei(en) erfolgreich importiert",
+            filesExported: "Datei(en) erfolgreich konsolidiert",
+            autoImportStarted: "Automatischer Import gestartet mit Intervall",
+            autoImportStopped: "Automatischer Import gestoppt",
+            selectFolder: "Bitte zuerst einen Stammordner auswählen",
+            toImport: "zum Import",
+            toExport: "zur Konsolidierung",
+            noFilesToSync: "Keine Dateien zum Synchronisieren",
+            updateAvailable: "🚀 Neue Version verfügbar! Zum Aktualisieren klicken."
         }
-    },
-    fr: {
+    }),
+    es: fm_mergeTranslations(baseTranslations, {
+        settings: {
+            title: "Configuración",
+            language: "Idioma",
+            rootFolder: "Carpeta raíz del proyecto",
+            rootFolderPlaceholder: "Detección automática",
+            rootFolderLevels: "Niveles superiores desde el archivo de proyecto",
+            rootFolderLevelsHelp: "Cuántos niveles subir desde la carpeta del archivo del proyecto (0 = misma carpeta, 1 = carpeta padre, 2 = carpeta abuelo)",
+            autoRelink: "Volver a enlazar medios automáticamente tras la consolidación",
+            autoImport: "Importación automática",
+            autoImportInterval: "Intervalo de importación automática (segundos)",
+            excludedFolders: "Carpetas excluidas de la consolidación",
+            excludedFoldersPlaceholder: "Ej: TEMP, CACHE, BACKUP\nUna carpeta por línea",
+            excludedFolderNames: "Nombres de carpetas a ignorar en importación",
+            excludedFolderNamesPlaceholder: "Ej: node_modules, .git, Thumbs.db",
+            bannedExtensions: "Extensiones de archivo prohibidas para importar",
+            bannedExtensionsPlaceholder: "Ej: .zip, .pptx, .exe\nUna extensión por línea"
+        },
+        buttons: {
+            analyze: "Analizar",
+            import: "Importar",
+            export: "Consolidar",
+            selectAll: "Todo",
+            deselectAll: "Ninguno",
+            save: "Guardar",
+            selectAllImport: "Todo",
+            deselectAllImport: "Ninguno",
+            selectAllExport: "Todo",
+            deselectAllExport: "Ninguno"
+        },
+        compact: {
+            import: "Importar",
+            export: "Consolidar"
+        },
+        labels: {
+            project: "Proyecto:",
+            rootFolder: "Carpeta raíz:",
+            current: "Actual:",
+            target: "Destino:",
+            bin: "Bin:",
+            binDefault: "Raíz",
+            offline: "sin conexión"
+        },
+        results: {
+            importTitle: "Archivos para importar",
+            exportTitle: "Archivos para consolidar",
+            emptyImport: "No hay archivos nuevos para importar",
+            emptyExport: "Todos los archivos están consolidados",
+            importSubtitle: "De carpeta → Premiere Pro",
+            exportSubtitle: "De Premiere Pro → carpeta",
+            importButton: "Importar",
+            exportButton: "Consolidar"
+        },
+        report: {
+            title: "Informe de consolidación",
+            success: "Éxito",
+            skipped: "Omitido (ya existe)",
+            failed: "Error"
+        },
+        status: {
+            analyzing: "Analizando proyecto...",
+            searching: "Buscando archivos nuevos...",
+            importing: "Importando archivos...",
+            exporting: "Consolidando archivos...",
+            relinking: "Volviendo a enlazar medios...",
+            completed: "Operación completada",
+            saved: "Configuración guardada",
+            noNewFiles: "No hay archivos nuevos para importar",
+            allSynced: "Todos los archivos están consolidados",
+            filesDetected: "archivo(s) detectado(s)",
+            newFilesDetected: "archivo(s) nuevo(s) detectado(s)",
+            filesImported: "archivo(s) importado(s) correctamente",
+            filesExported: "archivo(s) consolidado(s) correctamente",
+            autoImportStarted: "Importación automática iniciada con intervalo",
+            autoImportStopped: "Importación automática detenida",
+            selectFolder: "Primero selecciona una carpeta raíz",
+            toImport: "para importar",
+            toExport: "para consolidar",
+            noFilesToSync: "No hay archivos para sincronizar",
+            updateAvailable: "🚀 ¡Nueva versión disponible! Haz clic para actualizar."
+        }
+    }),
+    fr: fm_mergeTranslations(baseTranslations, {
         settings: {
             title: "Paramètres",
             language: "Langue",
@@ -172,25 +358,447 @@ const translations = {
             noFilesToSync: "Aucun fichier à synchroniser",
             updateAvailable: "🚀 Nouvelle version disponible ! Cliquez pour mettre à jour."
         }
-    }
+    }),
+    it: fm_mergeTranslations(baseTranslations, {
+        settings: {
+            title: "Impostazioni",
+            language: "Lingua",
+            rootFolder: "Cartella radice del progetto",
+            rootFolderPlaceholder: "Rilevamento automatico",
+            rootFolderLevels: "Livelli superiori dal file di progetto",
+            rootFolderLevelsHelp: "Di quanti livelli risalire dalla cartella del file progetto (0 = stessa cartella, 1 = cartella padre, 2 = cartella nonno)",
+            autoRelink: "Ricollega automaticamente i media dopo la consolidazione",
+            autoImport: "Importazione automatica",
+            autoImportInterval: "Intervallo importazione automatica (secondi)",
+            excludedFolders: "Cartelle escluse dalla consolidazione",
+            excludedFoldersPlaceholder: "Es: TEMP, CACHE, BACKUP\nUna cartella per riga",
+            excludedFolderNames: "Nomi cartelle da ignorare in importazione",
+            excludedFolderNamesPlaceholder: "Es: node_modules, .git, Thumbs.db",
+            bannedExtensions: "Estensioni file vietate in importazione",
+            bannedExtensionsPlaceholder: "Es: .zip, .pptx, .exe\nUna estensione per riga"
+        },
+        buttons: {
+            analyze: "Analizza",
+            import: "Importa",
+            export: "Consolida",
+            selectAll: "Tutto",
+            deselectAll: "Nessuno",
+            save: "Salva",
+            selectAllImport: "Tutto",
+            deselectAllImport: "Nessuno",
+            selectAllExport: "Tutto",
+            deselectAllExport: "Nessuno"
+        },
+        compact: {
+            import: "Importa",
+            export: "Consolida"
+        },
+        labels: {
+            project: "Progetto:",
+            rootFolder: "Cartella radice:",
+            current: "Attuale:",
+            target: "Destinazione:",
+            bin: "Bin:",
+            binDefault: "Radice",
+            offline: "offline"
+        },
+        results: {
+            importTitle: "File da importare",
+            exportTitle: "File da consolidare",
+            emptyImport: "Nessun nuovo file da importare",
+            emptyExport: "Tutti i file sono consolidati",
+            importSubtitle: "Da cartella → Premiere Pro",
+            exportSubtitle: "Da Premiere Pro → cartella",
+            importButton: "Importa",
+            exportButton: "Consolida"
+        },
+        report: {
+            title: "Report di consolidazione",
+            success: "Successo",
+            skipped: "Saltato (già esiste)",
+            failed: "Errore"
+        },
+        status: {
+            analyzing: "Analisi del progetto...",
+            searching: "Ricerca di nuovi file...",
+            importing: "Importazione file...",
+            exporting: "Consolidamento file...",
+            relinking: "Ricollegamento media...",
+            completed: "Operazione completata",
+            saved: "Impostazioni salvate",
+            noNewFiles: "Nessun nuovo file da importare",
+            allSynced: "Tutti i file sono consolidati",
+            filesDetected: "file rilevato/i",
+            newFilesDetected: "nuovo/i file rilevato/i",
+            filesImported: "file importato/i con successo",
+            filesExported: "file consolidato/i con successo",
+            autoImportStarted: "Importazione automatica avviata con intervallo",
+            autoImportStopped: "Importazione automatica arrestata",
+            selectFolder: "Seleziona prima una cartella radice",
+            toImport: "da importare",
+            toExport: "da consolidare",
+            noFilesToSync: "Nessun file da sincronizzare",
+            updateAvailable: "🚀 Nuova versione disponibile! Clicca per aggiornare."
+        }
+    }),
+    'pt-BR': fm_mergeTranslations(baseTranslations, {
+        settings: {
+            title: "Configurações",
+            language: "Idioma",
+            rootFolder: "Pasta raiz do projeto",
+            rootFolderPlaceholder: "Detecção automática",
+            rootFolderLevels: "Níveis acima do arquivo de projeto",
+            rootFolderLevelsHelp: "Quantos níveis subir a partir da pasta do arquivo de projeto (0 = mesma pasta, 1 = pasta pai, 2 = pasta avô)",
+            autoRelink: "Religar mídia automaticamente após consolidação",
+            autoImport: "Importação automática",
+            autoImportInterval: "Intervalo da importação automática (segundos)",
+            excludedFolders: "Pastas excluídas da consolidação",
+            excludedFoldersPlaceholder: "Ex: TEMP, CACHE, BACKUP\nUma pasta por linha",
+            excludedFolderNames: "Nomes de pastas para ignorar na importação",
+            excludedFolderNamesPlaceholder: "Ex: node_modules, .git, Thumbs.db",
+            bannedExtensions: "Extensões de arquivo proibidas na importação",
+            bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nUma extensão por linha"
+        },
+        buttons: {
+            analyze: "Analisar",
+            import: "Importar",
+            export: "Consolidar",
+            selectAll: "Tudo",
+            deselectAll: "Nenhum",
+            save: "Salvar",
+            selectAllImport: "Tudo",
+            deselectAllImport: "Nenhum",
+            selectAllExport: "Tudo",
+            deselectAllExport: "Nenhum"
+        },
+        compact: {
+            import: "Importar",
+            export: "Consolidar"
+        },
+        labels: {
+            project: "Projeto:",
+            rootFolder: "Pasta raiz:",
+            current: "Atual:",
+            target: "Destino:",
+            bin: "Bin:",
+            binDefault: "Raiz",
+            offline: "offline"
+        },
+        results: {
+            importTitle: "Arquivos para importar",
+            exportTitle: "Arquivos para consolidar",
+            emptyImport: "Nenhum arquivo novo para importar",
+            emptyExport: "Todos os arquivos estão consolidados",
+            importSubtitle: "Da pasta → Premiere Pro",
+            exportSubtitle: "Do Premiere Pro → pasta",
+            importButton: "Importar",
+            exportButton: "Consolidar"
+        },
+        report: {
+            title: "Relatório de consolidação",
+            success: "Sucesso",
+            skipped: "Ignorado (já existe)",
+            failed: "Falha"
+        },
+        status: {
+            analyzing: "Analisando projeto...",
+            searching: "Procurando novos arquivos...",
+            importing: "Importando arquivos...",
+            exporting: "Consolidando arquivos...",
+            relinking: "Religando mídia...",
+            completed: "Operação concluída",
+            saved: "Configurações salvas",
+            noNewFiles: "Nenhum arquivo novo para importar",
+            allSynced: "Todos os arquivos estão consolidados",
+            filesDetected: "arquivo(s) detectado(s)",
+            newFilesDetected: "novo(s) arquivo(s) detectado(s)",
+            filesImported: "arquivo(s) importado(s) com sucesso",
+            filesExported: "arquivo(s) consolidado(s) com sucesso",
+            autoImportStarted: "Importação automática iniciada com intervalo",
+            autoImportStopped: "Importação automática parada",
+            selectFolder: "Selecione uma pasta raiz primeiro",
+            toImport: "para importar",
+            toExport: "para consolidar",
+            noFilesToSync: "Nenhum arquivo para sincronizar",
+            updateAvailable: "🚀 Nova versão disponível! Clique para atualizar."
+        }
+    }),
+    ru: fm_mergeTranslations(baseTranslations, {
+        settings: {
+            title: "Настройки",
+            language: "Язык",
+            rootFolder: "Корневая папка проекта",
+            rootFolderPlaceholder: "Автоопределение",
+            rootFolderLevels: "Уровни выше файла проекта",
+            rootFolderLevelsHelp: "На сколько уровней подняться от папки файла проекта (0 = та же папка, 1 = родительская, 2 = на уровень выше)",
+            autoRelink: "Автоперепривязка медиа после консолидации",
+            autoImport: "Автоимпорт",
+            autoImportInterval: "Интервал автоимпорта (секунды)",
+            excludedFolders: "Папки, исключённые из консолидации",
+            excludedFoldersPlaceholder: "Пример: TEMP, CACHE, BACKUP\nОдна папка на строку",
+            excludedFolderNames: "Имена папок, игнорируемые при импорте",
+            excludedFolderNamesPlaceholder: "Пример: node_modules, .git, Thumbs.db",
+            bannedExtensions: "Расширения файлов, запрещённые для импорта",
+            bannedExtensionsPlaceholder: "Пример: .zip, .pptx, .exe\nОдно расширение на строку"
+        },
+        buttons: {
+            analyze: "Анализ",
+            import: "Импорт",
+            export: "Консолидация",
+            selectAll: "Все",
+            deselectAll: "Ничего",
+            save: "Сохранить",
+            selectAllImport: "Все",
+            deselectAllImport: "Ничего",
+            selectAllExport: "Все",
+            deselectAllExport: "Ничего"
+        },
+        compact: {
+            import: "Импорт",
+            export: "Консолидация"
+        },
+        labels: {
+            project: "Проект:",
+            rootFolder: "Корневая папка:",
+            current: "Текущий:",
+            target: "Цель:",
+            bin: "Бин:",
+            binDefault: "Корень",
+            offline: "не в сети"
+        },
+        results: {
+            importTitle: "Файлы для импорта",
+            exportTitle: "Файлы для консолидации",
+            emptyImport: "Нет новых файлов для импорта",
+            emptyExport: "Все файлы консолидированы",
+            importSubtitle: "Из папки → Premiere Pro",
+            exportSubtitle: "Из Premiere Pro → в папку",
+            importButton: "Импорт",
+            exportButton: "Консолидация"
+        },
+        report: {
+            title: "Отчёт о консолидации",
+            success: "Успех",
+            skipped: "Пропущено (уже существует)",
+            failed: "Ошибка"
+        },
+        status: {
+            analyzing: "Анализ проекта...",
+            searching: "Поиск новых файлов...",
+            importing: "Импорт файлов...",
+            exporting: "Консолидация файлов...",
+            relinking: "Перепривязка медиа...",
+            completed: "Операция завершена",
+            saved: "Настройки сохранены",
+            noNewFiles: "Нет новых файлов для импорта",
+            allSynced: "Все файлы консолидированы",
+            filesDetected: "файл(ов) обнаружено",
+            newFilesDetected: "новых файл(ов) обнаружено",
+            filesImported: "файл(ов) успешно импортировано",
+            filesExported: "файл(ов) успешно консолидировано",
+            autoImportStarted: "Автоимпорт запущен с интервалом",
+            autoImportStopped: "Автоимпорт остановлен",
+            selectFolder: "Сначала выберите корневую папку",
+            toImport: "к импорту",
+            toExport: "к консолидации",
+            noFilesToSync: "Нет файлов для синхронизации",
+            updateAvailable: "🚀 Доступна новая версия! Нажмите для обновления."
+        }
+    }),
+    ja: fm_mergeTranslations(baseTranslations, {
+        settings: {
+            title: "設定",
+            language: "言語",
+            rootFolder: "プロジェクトのルートフォルダー",
+            rootFolderPlaceholder: "自動検出",
+            rootFolderLevels: "プロジェクトファイルからの親階層数",
+            rootFolderLevelsHelp: "プロジェクトファイルのフォルダーから何階層上を使うか (0 = 同じフォルダー, 1 = 親, 2 = 祖父母)",
+            autoRelink: "統合後にメディアを自動再リンク",
+            autoImport: "自動インポート",
+            autoImportInterval: "自動インポート間隔 (秒)",
+            excludedFolders: "統合から除外するフォルダー",
+            excludedFoldersPlaceholder: "例: TEMP, CACHE, BACKUP\n1行に1フォルダー",
+            excludedFolderNames: "インポート時に無視するフォルダー名",
+            excludedFolderNamesPlaceholder: "例: node_modules, .git, Thumbs.db",
+            bannedExtensions: "インポート禁止の拡張子",
+            bannedExtensionsPlaceholder: "例: .zip, .pptx, .exe\n1行に1拡張子"
+        },
+        buttons: {
+            analyze: "解析",
+            import: "インポート",
+            export: "統合",
+            selectAll: "全て",
+            deselectAll: "なし",
+            save: "保存",
+            selectAllImport: "全て",
+            deselectAllImport: "なし",
+            selectAllExport: "全て",
+            deselectAllExport: "なし"
+        },
+        compact: {
+            import: "インポート",
+            export: "統合"
+        },
+        labels: {
+            project: "プロジェクト:",
+            rootFolder: "ルートフォルダー:",
+            current: "現在:",
+            target: "保存先:",
+            bin: "ビン:",
+            binDefault: "ルート",
+            offline: "オフライン"
+        },
+        results: {
+            importTitle: "インポートするファイル",
+            exportTitle: "統合するファイル",
+            emptyImport: "インポートする新しいファイルはありません",
+            emptyExport: "すべてのファイルが統合済みです",
+            importSubtitle: "フォルダー → Premiere Pro",
+            exportSubtitle: "Premiere Pro → フォルダー",
+            importButton: "インポート",
+            exportButton: "統合"
+        },
+        report: {
+            title: "統合レポート",
+            success: "成功",
+            skipped: "スキップ (既に存在)",
+            failed: "失敗"
+        },
+        status: {
+            analyzing: "プロジェクトを解析中...",
+            searching: "新しいファイルを検索中...",
+            importing: "ファイルをインポート中...",
+            exporting: "ファイルを統合中...",
+            relinking: "メディアを再リンク中...",
+            completed: "操作が完了しました",
+            saved: "設定を保存しました",
+            noNewFiles: "インポートする新しいファイルはありません",
+            allSynced: "すべてのファイルが統合済みです",
+            filesDetected: "件のファイルを検出",
+            newFilesDetected: "件の新規ファイルを検出",
+            filesImported: "件のファイルを正常にインポート",
+            filesExported: "件のファイルを正常に統合",
+            autoImportStarted: "自動インポートを次の間隔で開始",
+            autoImportStopped: "自動インポートを停止",
+            selectFolder: "先にルートフォルダーを選択してください",
+            toImport: "インポート対象",
+            toExport: "統合対象",
+            noFilesToSync: "同期するファイルはありません",
+            updateAvailable: "🚀 新しいバージョンがあります。クリックして更新してください。"
+        }
+    }),
+    'zh-CN': fm_mergeTranslations(baseTranslations, {
+        settings: {
+            title: "设置",
+            language: "语言",
+            rootFolder: "项目根文件夹",
+            rootFolderPlaceholder: "自动检测",
+            rootFolderLevels: "从项目文件向上的层级",
+            rootFolderLevelsHelp: "从项目文件所在文件夹向上几级 (0 = 同级文件夹, 1 = 上一级, 2 = 上两级)",
+            autoRelink: "整合后自动重新链接媒体",
+            autoImport: "自动导入",
+            autoImportInterval: "自动导入间隔 (秒)",
+            excludedFolders: "从整合中排除的文件夹",
+            excludedFoldersPlaceholder: "例如: TEMP, CACHE, BACKUP\n每行一个文件夹",
+            excludedFolderNames: "导入时忽略的文件夹名称",
+            excludedFolderNamesPlaceholder: "例如: node_modules, .git, Thumbs.db",
+            bannedExtensions: "禁止导入的文件扩展名",
+            bannedExtensionsPlaceholder: "例如: .zip, .pptx, .exe\n每行一个扩展名"
+        },
+        buttons: {
+            analyze: "分析",
+            import: "导入",
+            export: "整合",
+            selectAll: "全部",
+            deselectAll: "无",
+            save: "保存",
+            selectAllImport: "全部",
+            deselectAllImport: "无",
+            selectAllExport: "全部",
+            deselectAllExport: "无"
+        },
+        compact: {
+            import: "导入",
+            export: "整合"
+        },
+        labels: {
+            project: "项目:",
+            rootFolder: "根文件夹:",
+            current: "当前:",
+            target: "目标:",
+            bin: "素材箱:",
+            binDefault: "根目录",
+            offline: "离线"
+        },
+        results: {
+            importTitle: "待导入文件",
+            exportTitle: "待整合文件",
+            emptyImport: "没有可导入的新文件",
+            emptyExport: "所有文件都已整合",
+            importSubtitle: "文件夹 → Premiere Pro",
+            exportSubtitle: "Premiere Pro → 文件夹",
+            importButton: "导入",
+            exportButton: "整合"
+        },
+        report: {
+            title: "整合报告",
+            success: "成功",
+            skipped: "已跳过 (已存在)",
+            failed: "失败"
+        },
+        status: {
+            analyzing: "正在分析项目...",
+            searching: "正在查找新文件...",
+            importing: "正在导入文件...",
+            exporting: "正在整合文件...",
+            relinking: "正在重新链接媒体...",
+            completed: "操作已完成",
+            saved: "设置已保存",
+            noNewFiles: "没有可导入的新文件",
+            allSynced: "所有文件都已整合",
+            filesDetected: "个文件已检测",
+            newFilesDetected: "个新文件已检测",
+            filesImported: "个文件导入成功",
+            filesExported: "个文件整合成功",
+            autoImportStarted: "已按间隔启动自动导入",
+            autoImportStopped: "已停止自动导入",
+            selectFolder: "请先选择根文件夹",
+            toImport: "待导入",
+            toExport: "待整合",
+            noFilesToSync: "没有可同步的文件",
+            updateAvailable: "🚀 有新版本可用！点击更新。"
+        }
+    })
 };
 
 let currentLang = 'en'; // Default language
 
-// Translation function
-function t(key) {
+// Resolve a dotted translation key for a specific language
+function resolveTranslation(lang, key) {
     const keys = key.split('.');
-    let value = translations[currentLang];
+    let value = translations[lang];
 
     for (const k of keys) {
         if (value && typeof value === 'object' && k in value) {
             value = value[k];
         } else {
-            return key; // Return key if translation not found
+            return null;
         }
     }
 
     return value;
+}
+
+// Translation function
+function t(key) {
+    const langValue = resolveTranslation(currentLang, key);
+    if (langValue !== null && langValue !== undefined) {
+        return langValue;
+    }
+
+    // Fallback to English when a key is missing in the selected language
+    const fallbackValue = resolveTranslation('en', key);
+    return fallbackValue !== null && fallbackValue !== undefined ? fallbackValue : key;
 }
 
 // Update UI with current language

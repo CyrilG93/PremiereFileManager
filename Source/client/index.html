@@ -242,16 +242,6 @@
                 </div>
 
                 <div class="setting-item">
-                    <label for="hostLogLevel" data-i18n="settings.hostLogLevel">Host log level</label>
-                    <select id="hostLogLevel">
-                        <option value="debug">Debug</option>
-                        <option value="info">Info</option>
-                        <option value="warn">Warn</option>
-                        <option value="error">Error</option>
-                    </select>
-                </div>
-
-                <div class="setting-item">
                     <label for="rootFolder" data-i18n="settings.rootFolder">Dossier racine du projet</label>
                     <div class="folder-input-group">
                         <input type="text" id="rootFolder" data-i18n-placeholder="settings.rootFolderPlaceholder"
@@ -311,6 +301,15 @@
                         la consolidation</label>
                     <textarea id="excludedFolders" rows="3" data-i18n-placeholder="settings.excludedFoldersPlaceholder"
                         placeholder="Ex: TEMP, CACHE, BACKUP&#10;Un dossier par ligne"></textarea>
+                </div>
+                <div class="setting-item">
+                    <label for="hostLogLevel" data-i18n="settings.hostLogLevel">Host log level</label>
+                    <select id="hostLogLevel">
+                        <option value="debug">Debug</option>
+                        <option value="info">Info</option>
+                        <option value="warn">Warn</option>
+                        <option value="error">Error</option>
+                    </select>
                 </div>
 
                 <button class="save-settings-btn" id="saveSettingsBtn" data-i18n="buttons.save">Enregistrer</button>

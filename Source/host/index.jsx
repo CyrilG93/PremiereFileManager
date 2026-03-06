@@ -1683,110 +1683,204 @@ function getOrCreateBin(binPath) {
 function FileManager_importFilesToProject(filesJson) {
     try {
         var files = JSON.parse(filesJson);
+        if (!files || !(files instanceof Array)) {
+            return JSON.stringify({ error: 'Invalid files payload' });
+        }
+
         var results = [];
+        var resultsByIndex = {};
         var blacklistDirty = false;
         var blacklistRoot = FM_LAST_PROJECT_ROOT_FOR_BLACKLIST || FileManager_getProjectRootPath(0);
+        var importGroups = {};
+        var importGroupOrder = [];
 
         if (blacklistRoot && blacklistRoot !== '') {
             loadFailedImportsBlacklist(blacklistRoot);
         }
 
+        // Record one success result with stable shape
+        function recordSuccess(file, index) {
+            resultsByIndex[index] = {
+                name: file.name,
+                success: true,
+                binPath: file.binPath
+            };
+        }
+
+        // Record one failure result, update failed-import blacklist, and emit diagnostics
+        function recordFailure(file, index, errorText) {
+            var safeErrorText = errorText || 'Unknown import error';
+            var failureInfo = getImportFailureInfo(file.path, safeErrorText);
+            var normalizedPath = normalizePathKey(file.path);
+            FAILED_IMPORTS_BLACKLIST[normalizedPath] = new Date().getTime();
+            blacklistDirty = true;
+
+            logPlatform('BLACKLIST ADD: Added to blacklist: ' + file.path, 'warn');
+            logPlatform('BLACKLIST ADD: Normalized path: ' + normalizedPath, 'debug');
+            logPlatform('BLACKLIST ADD: Error was: ' + safeErrorText, 'warn');
+            if (failureInfo.incompatibleFormat) {
+                logPlatform('BLACKLIST EXTENSION SUGGESTION: ' + failureInfo.suggestedBanExtension, 'warn');
+            }
+
+            resultsByIndex[index] = {
+                name: file.name,
+                success: false,
+                incompatibleFormat: failureInfo.incompatibleFormat,
+                suggestedBanExtension: failureInfo.suggestedBanExtension,
+                error: safeErrorText
+            };
+        }
+
+        // Import one file into a resolved bin
+        function importSingleFile(file, index, targetBin) {
+            try {
+                var singleResult = app.project.importFiles([file.path], true, targetBin, false);
+                if (singleResult === false) {
+                    recordFailure(file, index, 'Import returned false');
+                } else {
+                    recordSuccess(file, index);
+                }
+            } catch (singleImportError) {
+                recordFailure(file, index, singleImportError.toString());
+            }
+        }
+
+        // Check if Premiere already contains the file (by relative path or signature)
+        // Used after a failed batch import to avoid duplicate imports on fallback
+        function isAlreadyInProjectByIndex(file, projectRoot, projectIndex) {
+            if (!projectRoot || !projectIndex) {
+                return false;
+            }
+
+            var relativePath = getRelativePath(file.path, projectRoot);
+            if (projectIndex.relativePathLookup[relativePath] === true) {
+                return true;
+            }
+
+            var sourceFile = new File(file.path);
+            var size = -1;
+            var modified = 0;
+            if (sourceFile && sourceFile.exists) {
+                size = sourceFile.length || 0;
+                modified = sourceFile.modified ? sourceFile.modified.getTime() : 0;
+            }
+
+            var signature = buildMediaSignature(file.name, size, modified);
+            return signature !== '' && projectIndex.signatureLookup[signature] === true;
+        }
+
+        // Pre-validate files and group by bin path so each bin can be imported in one call
         for (var i = 0; i < files.length; i++) {
             var file = files[i];
+            if (!file || !file.path) {
+                resultsByIndex[i] = {
+                    name: file && file.name ? file.name : 'Unknown',
+                    success: false,
+                    incompatibleFormat: false,
+                    suggestedBanExtension: '',
+                    error: 'Invalid file payload'
+                };
+                continue;
+            }
 
+            var sourceFile = new File(file.path);
+            if (!sourceFile.exists) {
+                resultsByIndex[i] = {
+                    name: file.name,
+                    success: false,
+                    incompatibleFormat: false,
+                    suggestedBanExtension: '',
+                    error: 'Source file does not exist: ' + file.path
+                };
+                continue;
+            }
+
+            var groupKey = file.binPath || '';
+            if (!importGroups.hasOwnProperty(groupKey)) {
+                importGroups[groupKey] = [];
+                importGroupOrder.push(groupKey);
+            }
+
+            importGroups[groupKey].push({
+                file: file,
+                index: i
+            });
+        }
+
+        // Import each bin group in one call, with per-file fallback only when needed
+        for (var g = 0; g < importGroupOrder.length; g++) {
+            var groupKey = importGroupOrder[g];
+            var groupItems = importGroups[groupKey];
+            if (!groupItems || groupItems.length === 0) {
+                continue;
+            }
+
+            var targetBin = null;
             try {
-                // Verify file exists before attempting import
-                var fileObj = new File(file.path);
-                if (!fileObj.exists) {
-                    results.push({
-                        name: file.name,
-                        success: false,
-                        incompatibleFormat: false,
-                        suggestedBanExtension: '',
-                        error: 'Source file does not exist: ' + file.path
-                    });
+                targetBin = getOrCreateBin(groupKey);
+            } catch (binError) {
+                for (var bi = 0; bi < groupItems.length; bi++) {
+                    recordFailure(groupItems[bi].file, groupItems[bi].index, 'Bin error: ' + binError.toString());
+                }
+                continue;
+            }
+
+            var batchPaths = [];
+            for (var bp = 0; bp < groupItems.length; bp++) {
+                batchPaths.push(groupItems[bp].file.path);
+            }
+
+            var batchFailed = false;
+            var batchErrorText = '';
+            try {
+                var batchResult = app.project.importFiles(batchPaths, true, targetBin, false);
+                if (batchResult === false) {
+                    batchFailed = true;
+                    batchErrorText = 'Batch import returned false';
+                }
+            } catch (batchError) {
+                batchFailed = true;
+                batchErrorText = batchError.toString();
+            }
+
+            if (!batchFailed) {
+                for (var bs = 0; bs < groupItems.length; bs++) {
+                    recordSuccess(groupItems[bs].file, groupItems[bs].index);
+                }
+                continue;
+            }
+
+            logPlatform('Batch import failed for bin "' + groupKey + '" (' + groupItems.length + ' files). Fallback to per-file import. Error: ' + batchErrorText, 'warn');
+
+            // Build one snapshot after batch failure to detect files that may already be imported
+            var projectRootForFallback = blacklistRoot || FileManager_getProjectRootPath(0);
+            var fallbackProjectIndex = null;
+            if (projectRootForFallback && projectRootForFallback !== '') {
+                fallbackProjectIndex = getProjectFilesIndex(projectRootForFallback);
+            }
+
+            for (var sf = 0; sf < groupItems.length; sf++) {
+                var groupEntry = groupItems[sf];
+                if (fallbackProjectIndex && isAlreadyInProjectByIndex(groupEntry.file, projectRootForFallback, fallbackProjectIndex)) {
+                    recordSuccess(groupEntry.file, groupEntry.index);
                     continue;
                 }
 
-                // Get or create bin
-                var targetBin = getOrCreateBin(file.binPath);
+                importSingleFile(groupEntry.file, groupEntry.index, targetBin);
+            }
+        }
 
-                // Import file - importFiles expects an array of paths
-                // This can throw errors for unsupported formats
-                var importedItems = null;
-                var importError = null;
-
-                try {
-                    importedItems = app.project.importFiles([file.path], true, targetBin, false);
-                } catch (importEx) {
-                    importError = importEx;
-                }
-
-                // Check if import failed
-                if (importError) {
-                    var importErrorText = importError.toString();
-                    var failureInfo = getImportFailureInfo(file.path, importErrorText);
-
-                    // Import failed - add to blacklist to prevent retry loops
-                    var normalizedPath = normalizePathKey(file.path);
-                    FAILED_IMPORTS_BLACKLIST[normalizedPath] = new Date().getTime();
-                    blacklistDirty = true;
-
-                    // Debug: Log blacklist addition and current state
-                    logPlatform('BLACKLIST ADD: Added to blacklist: ' + file.path, 'warn');
-                    logPlatform('BLACKLIST ADD: Normalized path: ' + normalizedPath, 'debug');
-                    logPlatform('BLACKLIST ADD: Error was: ' + importErrorText, 'warn');
-                    if (failureInfo.incompatibleFormat) {
-                        logPlatform('BLACKLIST EXTENSION SUGGESTION: ' + failureInfo.suggestedBanExtension, 'warn');
-                    }
-
-                    // Count blacklist entries
-                    var blacklistCount = 0;
-                    for (var key in FAILED_IMPORTS_BLACKLIST) {
-                        if (FAILED_IMPORTS_BLACKLIST.hasOwnProperty(key)) {
-                            blacklistCount++;
-                        }
-                    }
-                    logPlatform('BLACKLIST ADD: Total blacklisted files: ' + blacklistCount, 'debug');
-
-                    results.push({
-                        name: file.name,
-                        success: false,
-                        incompatibleFormat: failureInfo.incompatibleFormat,
-                        suggestedBanExtension: failureInfo.suggestedBanExtension,
-                        error: importErrorText
-                    });
-                } else if (importedItems && importedItems.length > 0) {
-                    // Import succeeded with items
-                    results.push({
-                        name: file.name,
-                        success: true,
-                        binPath: file.binPath
-                    });
-                } else {
-                    // Import may have succeeded even if no items returned (e.g., for sequences)
-                    results.push({
-                        name: file.name,
-                        success: true,
-                        binPath: file.binPath
-                    });
-                }
-            } catch (e) {
-                // Outer catch for any other errors (file access, etc.)
-                var outerErrorText = e.toString();
-                var outerFailureInfo = getImportFailureInfo(file.path, outerErrorText);
-                var normalizedPath = normalizePathKey(file.path);
-                FAILED_IMPORTS_BLACKLIST[normalizedPath] = new Date().getTime();
-                blacklistDirty = true;
-
-                logPlatform('Import error, added to blacklist: ' + file.path + ' - ' + outerErrorText, 'warn');
-
+        // Rebuild ordered results array for client-side mapping/debug stability
+        for (var r = 0; r < files.length; r++) {
+            if (resultsByIndex.hasOwnProperty(r)) {
+                results.push(resultsByIndex[r]);
+            } else {
                 results.push({
-                    name: file.name,
+                    name: files[r] && files[r].name ? files[r].name : 'Unknown',
                     success: false,
-                    incompatibleFormat: outerFailureInfo.incompatibleFormat,
-                    suggestedBanExtension: outerFailureInfo.suggestedBanExtension,
-                    error: outerErrorText
+                    incompatibleFormat: false,
+                    suggestedBanExtension: '',
+                    error: 'Import result missing'
                 });
             }
         }

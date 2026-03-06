@@ -99,6 +99,7 @@ The extension will detect files that are used in your project but located outsid
 - ⚙️ Optimized scan filters with O(1) lookup maps for banned extensions and excluded folder names
 - 📚 Added persistent failed-import blacklist file with TTL cleanup across sessions
 - 📦 Added import batching for large auto/manual imports to avoid oversized payloads
+- 🚀 Optimized host import path: files are now imported per bin in grouped calls (faster than one-by-one when many files share the same destination bin)
 - 📝 Added configurable host log level and connected it to persisted settings
 - 🪵 Capped debug UI log history to keep memory usage bounded during long sessions
 - 💾 Debounced frequent settings writes and flushes on explicit save

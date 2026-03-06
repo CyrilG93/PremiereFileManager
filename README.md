@@ -58,6 +58,7 @@ The extension will detect files that are used in your project but located outsid
 - Use the **Auto toggle button** in the header for quick on/off control
 - Or enable in Settings for more options
 - The button turns green when auto-import is active
+- Toggle state is persisted immediately, so Premiere relaunch keeps the same ON/OFF state
 
 ## Settings
 

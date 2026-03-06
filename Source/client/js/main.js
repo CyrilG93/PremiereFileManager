@@ -2486,7 +2486,15 @@ function toggleAutoImport() {
         autoImportCheckbox.checked = settings.autoImport;
     }
 
-    // Save settings
+    // Persist immediately so auto-import state survives Premiere restart
+    if (fm_settingsWriteDebounceTimer) {
+        clearTimeout(fm_settingsWriteDebounceTimer);
+        fm_settingsWriteDebounceTimer = null;
+    }
+    fm_pendingSettingsWriteData = null;
+    fm_writeSettingsToFile(settings);
+
+    // Keep localStorage as legacy/backup storage
     localStorage.setItem('fileManagerSettings', JSON.stringify(settings));
 }
 

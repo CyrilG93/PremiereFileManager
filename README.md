@@ -104,7 +104,6 @@ The extension will detect files that are used in your project but located outsid
 - 📝 Added configurable host log level and connected it to persisted settings
 - 🪵 Capped debug UI log history to keep memory usage bounded during long sessions
 - 💾 Debounced frequent settings writes and flushes on explicit save
-- 💽 Scan cache is now written only when data actually changed
 - ✅ Auto-import toggle state now persists immediately and is restored on next Premiere launch
 - 🪟 Fixed Windows NAS path normalization for consolidation (avoids false "external file" detection when media is already inside project root)
 

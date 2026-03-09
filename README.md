@@ -92,7 +92,7 @@ The extension will detect files that are used in your project but located outsid
 - 🛡️ Improved banned-extensions defaults and update migration:
   - Added common non-importable files (shortcuts, camera sidecars, incompatible image formats)
   - On update, missing default banned extensions are auto-added without removing user custom extensions
-- ⚡ Added incremental scan cache to reduce repeated stability checks on unchanged files
+- ⚡ Scan cache to reduce repeated stability checks on unchanged files
 - 🔁 Added advanced deduplication for import candidates (source path + clip signature name/size/mtime)
 - 🚫 Auto-import now suggests auto-banning extension only when host classifies the import failure as incompatible format (not corruption/IO errors)
 - 📦 Reinforced transfer-in-progress protection with stricter file stability checks and extra pass for very recent files

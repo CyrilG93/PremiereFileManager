@@ -5,10 +5,10 @@ let currentFiles = [];
 let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
-let CURRENT_VERSION = '1.3.1';
+let CURRENT_VERSION = '1.3.2';
 
 // SpellBook identifies this CEP panel with the extension id from manifest.xml
-const FM_SPELLBOOK_PLUGIN_NAME = 'Premiere File Manager';
+const FM_SPELLBOOK_PLUGIN_NAME = 'File Manager';
 const FM_SPELLBOOK_PLUGIN_ID = 'com.filemanager.premiere.panel';
 
 // Deep-merge helper to build locale packs from a shared base dictionary

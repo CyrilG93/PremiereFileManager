@@ -8,6 +8,7 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 - 🎥 **Camera Folder Support**: Detect major camera card structures and import only media clips (without recreating full technical folder trees)
 - 📦 **Consolidate**: Organize external files into your project structure (copy files that are outside your project folder)
 - 🔄 **Auto-Import Toggle**: Quick toggle button in header with visual feedback
+- ⌨️ **SpellBook Support**: Trigger compact actions from SpellBook shortcuts or control surfaces
 - 🔗 **Auto-Relink**: Automatically relink media when files are moved
 - 🚫 **File Filtering**: Exclude specific file types and folders
 - 🌍 **Multi-language**: Support for Deutsch, English, Español, Français, Italiano, Português (Brasil), Русский, 日本語 and 简体中文 with instant language switch
@@ -60,6 +61,16 @@ The extension will detect files that are used in your project but located outsid
 - The button turns green when auto-import is active
 - Toggle state is persisted immediately, so Premiere relaunch keeps the same ON/OFF state
 
+### SpellBook
+
+Install the official SpellBook app and SpellBook extension from Knights of the Editing Table. File Manager registers three compact-mode commands in the **File Manager Compact** group:
+
+- **Toggle Auto Sync**
+- **Import**
+- **Consolidate**
+
+The **Import** and **Consolidate** commands use the same one-click behavior as compact mode: analyze first, then process all detected files.
+
 ## Settings
 
 - **Language**: Quick language selector in header + full selector in settings
@@ -72,75 +83,6 @@ The extension will detect files that are used in your project but located outsid
 - **Banned Extensions**: File types to never import
 - **Auto-Import**: Enable automatic scanning
 - **Auto-Import Interval**: How often to scan (in seconds)
-
-## Version History
-
-### v1.3.0 (Latest)
-- 🎥 Added camera folder structure handling for import:
-  - ARRIRAW
-  - RED
-  - AVCHD
-  - Canon XF
-  - Panasonic P2
-  - XDCAM-EX
-  - XDCAM-HD
-  - Sony HDV
-  - Sony a7S
-  - DCIM
-- ✅ Camera imports now keep only the useful media clip and avoid recreating full technical card subfolders in bins
-- 🌍 Added UI language support for: Deutsch, English, Español, Français, Italiano, Português (Brasil), Русский, 日本語, 简体中文
-- 🛡️ Improved banned-extensions defaults and update migration:
-  - Added common non-importable files (shortcuts, camera sidecars, incompatible image formats)
-  - On update, missing default banned extensions are auto-added without removing user custom extensions
-- ⚡ Scan cache to reduce repeated stability checks on unchanged files
-- 🔁 Added advanced deduplication for import candidates (source path + clip signature name/size/mtime)
-- 🚫 Auto-import now suggests auto-banning extension only when host classifies the import failure as incompatible format (not corruption/IO errors)
-- 📦 Reinforced transfer-in-progress protection with stricter file stability checks and extra pass for very recent files
-- 🧠 Replaced filename-only fallback with robust signature fallback (name + size + mtime)
-- ⚙️ Optimized scan filters with O(1) lookup maps for banned extensions and excluded folder names
-- 📚 Added persistent failed-import blacklist file with TTL cleanup across sessions
-- 📦 Added import batching for large auto/manual imports to avoid oversized payloads
-- 🚀 Optimized host import path: files are now imported per bin in grouped calls (faster than one-by-one when many files share the same destination bin)
-- 📝 Added configurable host log level and connected it to persisted settings
-- 🪵 Capped debug UI log history to keep memory usage bounded during long sessions
-- 💾 Debounced frequent settings writes and flushes on explicit save
-- ✅ Auto-import toggle state now persists immediately and is restored on next Premiere launch
-- 🪟 Fixed Windows NAS path normalization for consolidation (avoids false "external file" detection when media is already inside project root)
-
-### v1.1.0
-- 🚀 **NAS Optimization**: Massive performance boost (up to 20x faster) and reliability fix for network transfers (EBADF)
-- 📊 **Progress UI**: Added detailed consolidation progress bar with real-time speed and ETA
-- 🛡️ **Stability**: Enhanced verification logic for zero-error file transfers
-- 🧹 **UX Improvements**: Minimalist compact mode ("3 buttons"), auto-hidden debug logs
-- 🌍 **Network**: Added directory creation verification for network shares
-
-### v1.0.8
-- ⚙️ **Config**: Moved configuration files to local storage for better management across updates
-- Sorted banned extensions alphabetically
-- Fixed JSON parsing error on batch export
-
-### v1.0.5
-- ✅ Added quick language selector with flag emojis in header
-- ✅ Instant language change without saving settings
-- ✅ Renamed "Export" to "Consolidate" for better clarity (matches Adobe terminology)
-- ✅ Added auto-import toggle button in header with visual feedback
-- ✅ Compact mode: auto button shows icon only
-- ✅ Fixed all translation inconsistencies
-
-### v1.0.4
-- Fixed duplicate import detection for moved projects
-- Added filename fallback comparison for cross-computer compatibility
-- Fixed double slash path normalization
-- Made debug section collapsible and closed by default
-- Improved path comparison for files outside project root
-
-### v1.0.3
-- Added filename fallback for import duplicate detection
-- Improved handling of files moved between computers
-
-### v1.0.2
-- Added debug UI for troubleshooting path issues
-- Improved logging and diagnostics
 
 ## Compatibility
 
@@ -201,3 +143,34 @@ For issues, questions, or feature requests, please send me a message on Discord.
 ## Credits
 
 Developed by CyrilG93.
+
+## Changelog
+
+### v1.3.1 (Latest) - 2026-06-29
+- Added SpellBook support for compact-mode shortcuts and control surfaces.
+- Registered three commands: Toggle Auto Sync, Import, and Consolidate.
+
+### v1.3.0
+- Added camera folder structure handling for import: ARRIRAW, RED, AVCHD, Canon XF, Panasonic P2, XDCAM-EX, XDCAM-HD, Sony HDV, Sony a7S, and DCIM.
+- Camera imports now keep only the useful media clip and avoid recreating full technical card subfolders in bins.
+- Added UI language support for Deutsch, English, Español, Français, Italiano, Português (Brasil), Русский, 日本語, and 简体中文.
+- Improved import filtering, scan performance, import batching, debug logging, and auto-import persistence.
+- Fixed Windows NAS path normalization for consolidation.
+
+### v1.1.0
+- Added NAS performance improvements, detailed consolidation progress, and compact-mode UX updates.
+
+### v1.0.8
+- Moved configuration files to local storage and improved settings reliability.
+
+### v1.0.5
+- Added quick language selection, instant language switching, clearer Consolidate naming, and the header auto-import toggle.
+
+### v1.0.4
+- Improved duplicate detection, moved-project handling, debug visibility, and external file path comparison.
+
+### v1.0.3
+- Improved import duplicate detection for moved projects.
+
+### v1.0.2
+- Added debug UI and improved troubleshooting diagnostics.

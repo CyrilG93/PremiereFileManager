@@ -5,7 +5,11 @@ let currentFiles = [];
 let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
-let CURRENT_VERSION = '1.3.0';
+let CURRENT_VERSION = '1.3.1';
+
+// SpellBook identifies this CEP panel with the extension id from manifest.xml
+const FM_SPELLBOOK_PLUGIN_NAME = 'Premiere File Manager';
+const FM_SPELLBOOK_PLUGIN_ID = 'com.filemanager.premiere.panel';
 
 // Deep-merge helper to build locale packs from a shared base dictionary
 function fm_mergeTranslations(base, overrides) {
@@ -1807,6 +1811,178 @@ function debugLog(message, level = 'info') {
     }
 }
 
+// Build the three compact-mode commands exposed to SpellBook
+function fm_getSpellbookCommands() {
+    return [
+        {
+            commandID: 'premiereFileManager.compact.toggleAutoSync',
+            name: 'Toggle Auto Sync',
+            group: 'File Manager Compact',
+            action: () => fm_runSpellbookCommand('toggleAutoSync')
+        },
+        {
+            commandID: 'premiereFileManager.compact.import',
+            name: 'Import',
+            group: 'File Manager Compact',
+            action: () => fm_runSpellbookCommand('import')
+        },
+        {
+            commandID: 'premiereFileManager.compact.consolidate',
+            name: 'Consolidate',
+            group: 'File Manager Compact',
+            action: () => fm_runSpellbookCommand('consolidate')
+        }
+    ];
+}
+
+// Run SpellBook commands through the same functions used by compact mode buttons
+function fm_runSpellbookCommand(commandName) {
+    debugLog(`SpellBook command: ${commandName}`, 'info');
+
+    if (commandName === 'toggleAutoSync') {
+        toggleAutoImport();
+        return;
+    }
+
+    if (commandName === 'import') {
+        compactImport();
+        return;
+    }
+
+    if (commandName === 'consolidate') {
+        compactExport();
+    }
+}
+
+// Try the official npm package first when it is available in the CEP runtime
+function fm_loadOfficialSpellbookConstructor() {
+    if (typeof require !== 'function') {
+        return null;
+    }
+
+    try {
+        const spellbookModule = require('@knights-of-the-editing-table/spell-book');
+        const Spellbook = spellbookModule && (spellbookModule.default || spellbookModule);
+        return typeof Spellbook === 'function' ? Spellbook : null;
+    } catch (e) {
+        debugLog(`SpellBook npm module unavailable, using CEP fallback: ${e.message}`, 'info');
+        return null;
+    }
+}
+
+// Dispatch a CEP event using the same payload shape as the official SpellBook package
+function fm_dispatchSpellbookCepEvent(type, data) {
+    if (!window.__adobe_cep__ || typeof window.__adobe_cep__.dispatchEvent !== 'function') {
+        return false;
+    }
+
+    let appId = 'PPRO';
+    try {
+        const hostEnvironment = JSON.parse(window.__adobe_cep__.getHostEnvironment());
+        appId = hostEnvironment.appId || appId;
+    } catch (e) {
+        debugLog(`SpellBook host environment parse failed: ${e.message}`, 'warning');
+    }
+
+    window.__adobe_cep__.dispatchEvent({
+        type,
+        scope: 'APPLICATION',
+        appId,
+        extensionId: window.__adobe_cep__.getExtensionId(),
+        data: JSON.stringify(data)
+    });
+
+    return true;
+}
+
+// Fallback bridge mirrors the public npm package behavior for CEP command events
+function fm_createSpellbookCepFallback(pluginName, pluginID, commands) {
+    return {
+        pluginName,
+        pluginID,
+        commands: commands || [],
+        commandListener: null,
+        appOpenedListener: null,
+        register(commandList) {
+            this.commands = commandList || [];
+            return fm_dispatchSpellbookCepEvent('knights_of_the_editing_table.spellbook.api.commands.add', {
+                pluginID: this.pluginID,
+                name: this.pluginName,
+                commands: this.commands
+            });
+        },
+        start() {
+            if (!window.__adobe_cep__ || typeof window.__adobe_cep__.addEventListener !== 'function') {
+                return false;
+            }
+
+            this.stop();
+
+            const eventType = `knights_of_the_editing_table.spellbook.api.${this.pluginID}.command.registered`;
+            this.commandListener = (event) => {
+                const commandID = event && event.data;
+                const command = this.commands.find((item) => item.commandID === commandID);
+                if (command && typeof command.action === 'function') {
+                    command.action();
+                }
+            };
+            this.appOpenedListener = () => this.register(this.commands);
+
+            window.__adobe_cep__.addEventListener(eventType, this.commandListener);
+            window.__adobe_cep__.addEventListener('knights_of_the_editing_table.spellbook.app.opened', this.appOpenedListener);
+            return true;
+        },
+        stop() {
+            if (!window.__adobe_cep__ || typeof window.__adobe_cep__.removeEventListener !== 'function') {
+                return;
+            }
+
+            const eventType = `knights_of_the_editing_table.spellbook.api.${this.pluginID}.command.registered`;
+            if (this.commandListener) {
+                window.__adobe_cep__.removeEventListener(eventType, this.commandListener);
+            }
+            if (this.appOpenedListener) {
+                window.__adobe_cep__.removeEventListener('knights_of_the_editing_table.spellbook.app.opened', this.appOpenedListener);
+            }
+            this.commandListener = null;
+            this.appOpenedListener = null;
+        }
+    };
+}
+
+let fm_spellbookInstance = null;
+
+// Register compact-mode controls with SpellBook when CEP APIs are available
+function fm_initializeSpellbook() {
+    if (fm_spellbookInstance) {
+        return;
+    }
+
+    if (!window.__adobe_cep__) {
+        debugLog('SpellBook skipped: CEP bridge unavailable', 'warning');
+        return;
+    }
+
+    const commands = fm_getSpellbookCommands();
+    const Spellbook = fm_loadOfficialSpellbookConstructor();
+
+    try {
+        if (Spellbook) {
+            fm_spellbookInstance = new Spellbook(FM_SPELLBOOK_PLUGIN_NAME, FM_SPELLBOOK_PLUGIN_ID, commands);
+            fm_spellbookInstance.register(commands);
+        } else {
+            fm_spellbookInstance = fm_createSpellbookCepFallback(FM_SPELLBOOK_PLUGIN_NAME, FM_SPELLBOOK_PLUGIN_ID, commands);
+            fm_spellbookInstance.start();
+            fm_spellbookInstance.register(commands);
+        }
+
+        debugLog('SpellBook commands registered: Toggle Auto Sync, Import, Consolidate', 'info');
+    } catch (e) {
+        fm_spellbookInstance = null;
+        debugLog(`SpellBook initialization failed: ${e.message}`, 'warning');
+    }
+}
+
 function clearDebugLogs() {
     const debugLogs = document.getElementById('debugLogs');
     const debugLogsContent = document.getElementById('debugLogsContent');
@@ -2577,6 +2753,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Compact mode
     document.getElementById('compactImportBtn').addEventListener('click', compactImport);
     document.getElementById('compactExportBtn').addEventListener('click', compactExport);
+    fm_initializeSpellbook();
 
     // Debug
     document.getElementById('clearLogsBtn').addEventListener('click', clearDebugLogs);

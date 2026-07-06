@@ -147,7 +147,12 @@ Developed by CyrilG93.
 
 ## Changelog
 
-### v1.3.2 (Latest) - 2026-06-29
+### v1.4.0 (Latest) - 2026-07-06
+- Added SpellBook compact commands for external shortcuts and control surfaces.
+- Added a clickable version badge in the full-mode header that opens the File Manager product page.
+- Improved camera-card imports, Windows NAS path handling, and installer debug-mode coverage.
+
+### v1.3.2 - 2026-06-29
 - Renamed the SpellBook extension section to **File Manager**.
 
 ### v1.3.1 - 2026-06-29

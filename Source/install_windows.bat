@@ -50,8 +50,11 @@ echo ==========================================
 REM Registry Hacks (PlayerDebugMode)
 echo.
 echo Enabling PlayerDebugMode (Registry)...
-echo    Setting CSXS 10-16 debug flags...
+echo    Setting CSXS 7-20 debug flags...
 
+reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.7" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
+reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.8" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
+reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.9" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
 reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.10" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
 reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.11" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
 reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.12" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
@@ -59,6 +62,10 @@ reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.13" /v PlayerDebugMode /t REG_SZ 
 reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.14" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
 reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.15" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
 reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.16" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
+reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.17" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
+reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.18" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
+reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.19" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
+reg add "HKEY_CURRENT_USER\Software\Adobe\CSXS.20" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul 2>nul
 echo Next steps:
 echo ==========================================
 echo 1. Restart Adobe Premiere Pro

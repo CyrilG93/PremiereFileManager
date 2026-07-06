@@ -53,7 +53,11 @@ defaults write com.adobe.CSXS.13 PlayerDebugMode 1 2>/dev/null
 defaults write com.adobe.CSXS.14 PlayerDebugMode 1 2>/dev/null
 defaults write com.adobe.CSXS.15 PlayerDebugMode 1 2>/dev/null
 defaults write com.adobe.CSXS.16 PlayerDebugMode 1 2>/dev/null
-echo "   ✓ Debug mode enabled for CSXS 9-16"
+defaults write com.adobe.CSXS.17 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.18 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.19 PlayerDebugMode 1 2>/dev/null
+defaults write com.adobe.CSXS.20 PlayerDebugMode 1 2>/dev/null
+echo "   ✓ Debug mode enabled for CSXS 9-20"
 
 echo ""
 echo "✓ Installation completed successfully!"

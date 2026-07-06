@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.3.3';
+let CURRENT_VERSION = '1.3.4';
 
 // SpellBook identifies this CEP panel with the extension id from manifest.xml
 const FM_SPELLBOOK_PLUGIN_NAME = 'File Manager';
@@ -2809,7 +2809,7 @@ function openExternalUrl(url) {
 }
 
 function initVersionLink() {
-    // Keep the product-page link on the full settings badge only; compact mode has no version badge.
+    // Keep the product-page link on the full header badge only; compact mode has no version badge.
     const versionBadge = document.getElementById('versionInfo');
     if (!versionBadge) return;
 

@@ -1125,6 +1125,7 @@ button svg {
     /* Hide detailed elements in compact mode */
     .header-content h1,
     .header-content .logo,
+    .version-badge,
     .settings-btn,
     .project-info,
     .analyze-btn,
@@ -1412,6 +1413,11 @@ main {
     font-weight: normal;
     transition: all 0.2s ease;
     vertical-align: middle;
+}
+
+.header-version-badge {
+    flex-shrink: 0;
+    margin-left: 0;
 }
 
 .version-badge:hover,

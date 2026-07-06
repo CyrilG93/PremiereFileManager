@@ -93,6 +93,10 @@
         display: none !important;
     }
 
+    .version-badge {
+        display: none !important;
+    }
+
     /* Show compact mode */
     .compact-mode {
         display: flex !important;

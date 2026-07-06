@@ -83,6 +83,7 @@ The **Import** and **Consolidate** commands use the same one-click behavior as c
 - **Banned Extensions**: File types to never import
 - **Auto-Import**: Enable automatic scanning
 - **Auto-Import Interval**: How often to scan (in seconds)
+- **Version Badge**: In full mode, click the version badge in Settings to open the File Manager product page
 
 ## Compatibility
 

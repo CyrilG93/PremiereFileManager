@@ -5,7 +5,8 @@ let currentFiles = [];
 let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
-let CURRENT_VERSION = '1.3.2';
+const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
+let CURRENT_VERSION = '1.3.3';
 
 // SpellBook identifies this CEP panel with the extension id from manifest.xml
 const FM_SPELLBOOK_PLUGIN_NAME = 'File Manager';
@@ -2724,6 +2725,7 @@ function toggleDebugSection() {
 document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
     getProjectInfo();
+    initVersionLink();
 
     // Connect fileOperations.js logging to the UI debug panel
     if (typeof fm_setLogCallback === 'function') {
@@ -2784,6 +2786,43 @@ document.addEventListener('DOMContentLoaded', () => {
 // UPDATE SYSTEM
 // ============================================================================
 
+function openExternalUrl(url) {
+    // Open external links through CEP in Premiere, with a browser fallback for local tests.
+    try {
+        const hasCepBrowser = typeof cep !== 'undefined' || (typeof window !== 'undefined' && window.cep);
+        if (hasCepBrowser && csInterface && typeof csInterface.openURLInDefaultBrowser === 'function') {
+            csInterface.openURLInDefaultBrowser(url);
+            return;
+        }
+    } catch (e) {
+        console.error('[Link] Error opening URL through CEP:', e);
+    }
+
+    try {
+        const popup = window.open(url, '_blank');
+        if (!popup) {
+            window.location.href = url;
+        }
+    } catch (e) {
+        console.error('[Link] Browser fallback failed:', e);
+    }
+}
+
+function initVersionLink() {
+    // Keep the product-page link on the full settings badge only; compact mode has no version badge.
+    const versionBadge = document.getElementById('versionInfo');
+    if (!versionBadge) return;
+
+    const openProductPage = () => openExternalUrl(PRODUCT_PAGE_URL);
+    versionBadge.addEventListener('click', openProductPage);
+    versionBadge.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            openProductPage();
+        }
+    });
+}
+
 /**
  * Compare two version strings (e.g. "1.0.0" vs "1.0.1")
  */
@@ -2833,6 +2872,7 @@ async function checkForUpdates() {
     const versionBadge = document.getElementById('versionInfo');
     if (versionBadge) {
         versionBadge.textContent = 'v' + localVersion;
+        versionBadge.setAttribute('aria-label', `Open File Manager page for version ${localVersion}`);
     }
 
     try {
@@ -2910,16 +2950,7 @@ function showUpdateBanner(downloadUrl) {
 
         banner.onclick = function () {
             if (downloadUrl) {
-                try {
-                    csInterface.openURLInDefaultBrowser(downloadUrl);
-                } catch (e) {
-                    console.error('[Update] Error opening URL:', e);
-                    try {
-                        window.location.href = downloadUrl;
-                    } catch (e2) {
-                        console.error('[Update] Fallback failed:', e2);
-                    }
-                }
+                openExternalUrl(downloadUrl);
             }
         };
     }

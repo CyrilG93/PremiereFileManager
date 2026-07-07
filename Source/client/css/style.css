@@ -3,10 +3,12 @@
     --bg-secondary: #252525;
     --bg-tertiary: #2d2d2d;
     --bg-hover: #323232;
+    --bg-tertiary-rgb: 45, 45, 45;
     --text-primary: #e0e0e0;
     --text-secondary: #a0a0a0;
     --text-tertiary: #707070;
     --accent-primary: #4a9eff;
+    --accent-primary-rgb: 74, 158, 255;
     --accent-hover: #5fadff;
     --accent-active: #3a8eef;
     --success: #4caf50;
@@ -28,7 +30,7 @@
 }
 
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--ui-font-family, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
     background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 13px;
@@ -239,7 +241,7 @@ button svg {
 .analyze-btn:hover {
     background: var(--accent-hover);
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(74, 158, 255, 0.3);
+    box-shadow: 0 4px 12px rgba(var(--accent-primary-rgb), 0.3);
 }
 
 .analyze-btn:active {
@@ -1402,7 +1404,7 @@ main {
 /* Version Badge */
 .version-badge {
     display: inline-block;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(var(--bg-tertiary-rgb), 0.85);
     border: 1px solid var(--border);
     color: var(--text-secondary);
     cursor: pointer;
@@ -1422,7 +1424,7 @@ main {
 
 .version-badge:hover,
 .version-badge:focus {
-    background: rgba(74, 158, 255, 0.16);
+    background: rgba(var(--accent-primary-rgb), 0.16);
     border-color: var(--accent-primary);
     color: var(--text-primary);
     outline: none;

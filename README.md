@@ -13,6 +13,7 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 - 🚫 **File Filtering**: Exclude specific file types and folders
 - 🌍 **Multi-language**: Support for Deutsch, English, Español, Français, Italiano, Português (Brasil), Русский, 日本語 and 简体中文 with instant language switch
 - 🎨 **Responsive UI**: Adapts to different panel sizes with compact mode
+- 🎛️ **Premiere Theme Support**: Follows Premiere Pro's light and dark interface colors
 - 🔍 **Debug Mode**: Built-in diagnostics for troubleshooting
 
 ## Installation

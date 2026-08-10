@@ -61,6 +61,7 @@ The extension will detect files that are used in your project but located outsid
 - Or enable in Settings for more options
 - The button turns green when auto-import is active
 - Toggle state is persisted immediately, so Premiere relaunch keeps the same ON/OFF state
+- Auto-import pauses while a consolidation is copying and relinking files, then resumes automatically
 
 ### SpellBook
 
@@ -121,16 +122,16 @@ If you're still experiencing this issue:
 
 ```
 PremiereFileManager/
-├── Source/
-│   ├── client/          # UI and client-side logic
-│   │   ├── index.html
-│   │   ├── css/
-│   │   ├── js/
-│   ├── host/            # ExtendScript (Premiere Pro API)
-│   │   └── index.jsx
-│   ├── CSXS/            # Extension manifest
-│   │   └── manifest.xml
-│   └── install scripts
+├── client/              # UI and client-side logic
+│   ├── index.html
+│   ├── css/
+│   └── js/
+├── host/                # ExtendScript (Premiere Pro API)
+│   └── index.jsx
+├── CSXS/                # Extension manifest
+│   └── manifest.xml
+├── install_macos.sh
+├── install_windows.bat
 └── Releases/            # Packaged releases
 ```
 

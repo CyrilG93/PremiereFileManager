@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.4.4';
+let CURRENT_VERSION = '1.4.5';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2104,6 +2104,9 @@ async function exportSelected() {
     const exportBtn = document.getElementById('exportBtn');
     exportBtn.disabled = true;
 
+    // Keep auto-import idle until every copied file has been relinked in Premiere.
+    fm_beginConsolidation();
+
     // Show consolidation progress section
     showConsolidationProgress(selectedFiles.length);
 
@@ -2181,6 +2184,9 @@ async function exportSelected() {
         showStatus('Erreur lors de l\'export: ' + e.message, 'error');
         exportBtn.disabled = false;
         hideConsolidationProgress();
+    } finally {
+        // Resume normal auto-import checks only after this consolidation is fully complete.
+        fm_endConsolidation();
     }
 }
 
@@ -2517,6 +2523,9 @@ async function synchronizeFiles() {
     const syncBtn = document.getElementById('syncBtn');
     syncBtn.disabled = true;
 
+    // This legacy synchronization path is also a consolidation and must pause auto-import.
+    fm_beginConsolidation();
+
     updateProgress(0, 'Préparation de la synchronisation...');
 
     // Prepare file list for copying
@@ -2570,6 +2579,9 @@ async function synchronizeFiles() {
         hideProgress();
         syncBtn.disabled = false;
         showStatus('Erreur lors de la synchronisation: ' + e.message, 'error');
+    } finally {
+        // Release the shared consolidation lock on both success and failure.
+        fm_endConsolidation();
     }
 }
 
@@ -2632,6 +2644,7 @@ function browseRootFolder() {
 async function compactSync() {
     const compactBtn = document.getElementById('compactSyncBtn');
     const compactStatus = document.getElementById('compactStatus');
+    let consolidationStarted = false;
 
     compactBtn.disabled = true;
     compactStatus.textContent = 'Analyse...';
@@ -2668,6 +2681,10 @@ async function compactSync() {
                 destination: file.targetPath
             }));
 
+            // Compact synchronization writes the same destination files as the full consolidation flow.
+            fm_beginConsolidation();
+            consolidationStarted = true;
+
             // Copy files
             const results = await copyFiles(filesToCopy, (progress) => {
                 compactStatus.textContent = `${progress.current}/${progress.total}`;
@@ -2701,6 +2718,11 @@ async function compactSync() {
         } catch (e) {
             compactStatus.textContent = 'Erreur: ' + e.message;
             compactBtn.disabled = false;
+        } finally {
+            // Do not leave auto-import paused if compact synchronization fails partway through.
+            if (consolidationStarted) {
+                fm_endConsolidation();
+            }
         }
     });
 }
@@ -2835,6 +2857,7 @@ async function compactImport() {
 // Compact mode: One-click export (analyze + export all)
 async function compactExport() {
     const compactExportBtn = document.getElementById('compactExportBtn');
+    let consolidationStarted = false;
 
     compactExportBtn.disabled = true;
 
@@ -2859,6 +2882,10 @@ async function compactExport() {
                 source: file.currentPath,
                 destination: file.targetPath
             }));
+
+            // Pause auto-import before destination files start appearing on disk.
+            fm_beginConsolidation();
+            consolidationStarted = true;
 
             const results = await copyFiles(filesToCopy);
 
@@ -2895,6 +2922,11 @@ async function compactExport() {
             compactExportBtn.disabled = false;
         } catch (e) {
             compactExportBtn.disabled = false;
+        } finally {
+            // Restore normal auto-import behavior after the compact consolidation ends.
+            if (consolidationStarted) {
+                fm_endConsolidation();
+            }
         }
     });
 }
@@ -2902,6 +2934,22 @@ async function compactExport() {
 // Auto-import functionality
 let autoImportTimer = null;
 let isImporting = false; // Lock to prevent multiple simultaneous imports
+let activeConsolidations = 0;
+
+// Track overlapping consolidation commands so auto-import resumes only after the final one completes.
+function fm_beginConsolidation() {
+    activeConsolidations += 1;
+    console.log(`Consolidation started (${activeConsolidations} active); auto-import is temporarily paused.`);
+}
+
+function fm_endConsolidation() {
+    activeConsolidations = Math.max(0, activeConsolidations - 1);
+    console.log(`Consolidation ended (${activeConsolidations} active); auto-import may resume when clear.`);
+}
+
+function fm_isConsolidating() {
+    return activeConsolidations > 0;
+}
 
 function analyzeForImport() {
     const importBtn = document.getElementById('importBtn');
@@ -3039,8 +3087,10 @@ function startAutoImport() {
 
     autoImportTimer = setInterval(() => {
         // Prevent multiple simultaneous imports
-        if (isImporting) {
-            console.log('Auto-import: Previous import still in progress, skipping...');
+        if (isImporting || fm_isConsolidating()) {
+            console.log(fm_isConsolidating()
+                ? 'Auto-import: Consolidation in progress, skipping this check.'
+                : 'Auto-import: Previous import still in progress, skipping...');
             return;
         }
 
@@ -3058,6 +3108,13 @@ function startAutoImport() {
 
             csInterface.evalScript(scanScript, async (result) => {
                 try {
+                    // A consolidation may have started while ExtendScript was scanning the folder.
+                    if (fm_isConsolidating()) {
+                        console.log('Auto-import: Consolidation started during scan, skipping import.');
+                        isImporting = false;
+                        return;
+                    }
+
                     const data = JSON.parse(result);
 
                     if (data.error) {
@@ -3069,6 +3126,13 @@ function startAutoImport() {
                     const newFiles = data.newFiles || [];
 
                     if (newFiles.length > 0) {
+                        // Do not import files discovered just before a consolidation started.
+                        if (fm_isConsolidating()) {
+                            console.log('Auto-import: Consolidation in progress, skipping detected files.');
+                            isImporting = false;
+                            return;
+                        }
+
                         try {
                             const importOutcome = await fm_importFilesInBatches(newFiles, {
                                 contextLabel: 'auto import',

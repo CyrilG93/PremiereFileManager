@@ -1106,7 +1106,7 @@ button svg {
 }
 
 .folder-label-rule input,
-.folder-label-rule select {
+.folder-label-picker-button {
     min-width: 0;
     background: var(--bg-tertiary);
     border: 1px solid var(--border);
@@ -1117,21 +1117,39 @@ button svg {
 }
 
 .folder-label-rule input:focus,
-.folder-label-rule select:focus {
+.folder-label-picker-button:focus {
     outline: none;
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
 }
 
-.folder-label-select-wrap {
+.folder-label-picker-wrap {
     display: flex;
     align-items: center;
-    gap: 6px;
     min-width: 0;
 }
 
-.folder-label-select-wrap select {
+.folder-label-picker-button {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     flex: 1;
+    width: 100%;
+    cursor: pointer;
+    text-align: left;
+}
+
+.folder-label-picker-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.folder-label-picker-caret {
+    margin-left: auto;
+    color: var(--text-secondary);
+    font-size: 15px;
+    line-height: 1;
 }
 
 .folder-label-swatch {
@@ -1140,6 +1158,40 @@ button svg {
     border: 1px solid rgba(255, 255, 255, 0.5);
     border-radius: 50%;
     flex: 0 0 auto;
+}
+
+/* Render the palette above the panel so it is never clipped by the settings scroller. */
+.folder-label-popover {
+    position: fixed;
+    z-index: 2147483647;
+    max-height: calc(100vh - 16px);
+    padding: 5px;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.folder-label-popover-option {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    padding: 7px 9px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.folder-label-popover-option:hover,
+.folder-label-popover-option.selected {
+    background: var(--bg-hover);
+    border-color: var(--accent-primary);
 }
 
 .remove-folder-label-rule-btn {

@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.4.2';
+let CURRENT_VERSION = '1.4.3';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -1096,6 +1096,7 @@ const FM_DEFAULT_PREMIERE_LABELS = [
     { id: 15, name: 'Yellow', color: '#e6e65c' }
 ];
 let FM_PREMIERE_LABELS = FM_DEFAULT_PREMIERE_LABELS.slice();
+let fm_activeFolderLabelPopover = null;
 
 // Accept only Premiere's fixed label indexes before values reach the host script.
 function fm_normalizeLabelColor(rawLabelColor) {
@@ -1206,13 +1207,112 @@ async function fm_refreshPremiereLabelDefinitions() {
     }
 }
 
-// Update one row's color dot to match its selected Premiere label.
-function fm_updateFolderLabelSwatch(selectElement, swatchElement) {
-    const label = FM_PREMIERE_LABELS[fm_normalizeLabelColor(selectElement.value) || 0];
-    swatchElement.style.backgroundColor = label.color;
+// Draw a compact picker button with the selected Premiere label name and its color swatch.
+function fm_renderFolderLabelPickerButton(pickerButton, rawLabelColor) {
+    const labelColor = fm_normalizeLabelColor(rawLabelColor);
+    const label = FM_PREMIERE_LABELS[labelColor === null ? 0 : labelColor];
+    const swatch = document.createElement('span');
+    const labelName = document.createElement('span');
+    const caret = document.createElement('span');
+
+    pickerButton.innerHTML = '';
+    pickerButton.setAttribute('data-label-color', String(label.id));
+    swatch.className = 'folder-label-swatch';
+    swatch.style.backgroundColor = label.color;
+    labelName.className = 'folder-label-picker-name';
+    labelName.textContent = label.name;
+    caret.className = 'folder-label-picker-caret';
+    caret.textContent = '⌄';
+    pickerButton.appendChild(swatch);
+    pickerButton.appendChild(labelName);
+    pickerButton.appendChild(caret);
 }
 
-// Render the source-folder-to-label rules as native controls because the palette has only 16 options.
+// Remove the active label palette and its outside-click handlers before opening another one.
+function fm_closeFolderLabelPopover() {
+    if (!fm_activeFolderLabelPopover) {
+        return;
+    }
+
+    document.removeEventListener('mousedown', fm_activeFolderLabelPopover.onDocumentMouseDown);
+    document.removeEventListener('keydown', fm_activeFolderLabelPopover.onDocumentKeyDown);
+    if (fm_activeFolderLabelPopover.element.parentNode) {
+        fm_activeFolderLabelPopover.element.parentNode.removeChild(fm_activeFolderLabelPopover.element);
+    }
+    fm_activeFolderLabelPopover = null;
+}
+
+// Open an opaque HTML palette that stays visible above the settings panel instead of using CEP's native menu.
+function fm_openFolderLabelPopover(anchorButton, selectedLabelColor, onSelect) {
+    fm_closeFolderLabelPopover();
+
+    const popover = document.createElement('div');
+    const normalizedLabelColor = fm_normalizeLabelColor(selectedLabelColor);
+    popover.className = 'folder-label-popover';
+    popover.setAttribute('role', 'listbox');
+
+    FM_PREMIERE_LABELS.forEach((label) => {
+        const optionButton = document.createElement('button');
+        const swatch = document.createElement('span');
+        const labelName = document.createElement('span');
+
+        optionButton.type = 'button';
+        optionButton.className = 'folder-label-popover-option' + (label.id === normalizedLabelColor ? ' selected' : '');
+        optionButton.setAttribute('role', 'option');
+        optionButton.setAttribute('aria-selected', label.id === normalizedLabelColor ? 'true' : 'false');
+        swatch.className = 'folder-label-swatch';
+        swatch.style.backgroundColor = label.color;
+        labelName.textContent = label.name;
+        optionButton.appendChild(swatch);
+        optionButton.appendChild(labelName);
+        optionButton.addEventListener('click', () => {
+            onSelect(label.id);
+            fm_closeFolderLabelPopover();
+        });
+        popover.appendChild(optionButton);
+    });
+
+    document.body.appendChild(popover);
+    const anchorRect = anchorButton.getBoundingClientRect();
+    const margin = 8;
+    const preferredWidth = 220;
+    const popoverWidth = Math.min(preferredWidth, Math.max(160, window.innerWidth - (margin * 2)));
+    popover.style.width = popoverWidth + 'px';
+    const popoverHeight = popover.offsetHeight;
+    const left = Math.max(margin, Math.min(anchorRect.left, window.innerWidth - popoverWidth - margin));
+    let top = anchorRect.bottom + 4;
+
+    // Flip above the picker when the remaining space below cannot show the palette.
+    if (top + popoverHeight > window.innerHeight - margin) {
+        top = Math.max(margin, anchorRect.top - popoverHeight - 4);
+    }
+
+    popover.style.left = left + 'px';
+    popover.style.top = top + 'px';
+
+    const onDocumentMouseDown = (event) => {
+        if (!popover.contains(event.target) && !anchorButton.contains(event.target)) {
+            fm_closeFolderLabelPopover();
+        }
+    };
+    const onDocumentKeyDown = (event) => {
+        if (event.key === 'Escape') {
+            fm_closeFolderLabelPopover();
+            anchorButton.focus();
+        }
+    };
+
+    fm_activeFolderLabelPopover = {
+        element: popover,
+        onDocumentMouseDown: onDocumentMouseDown,
+        onDocumentKeyDown: onDocumentKeyDown
+    };
+    // Register after the trigger click completes so it cannot immediately close the new palette.
+    setTimeout(() => document.addEventListener('mousedown', onDocumentMouseDown), 0);
+    document.addEventListener('keydown', onDocumentKeyDown);
+}
+
+// Render the source-folder-to-label rules with a custom palette that avoids invisible CEP native menus.
 function fm_renderFolderLabelRules() {
     const rulesContainer = document.getElementById('folderLabelRules');
     if (!rulesContainer) {
@@ -1224,9 +1324,8 @@ function fm_renderFolderLabelRules() {
     settings.folderLabelRules.forEach((rule, ruleIndex) => {
         const row = document.createElement('div');
         const folderInput = document.createElement('input');
-        const labelSelectWrap = document.createElement('div');
-        const swatch = document.createElement('span');
-        const labelSelect = document.createElement('select');
+        const labelPickerWrap = document.createElement('div');
+        const labelPickerButton = document.createElement('button');
         const removeButton = document.createElement('button');
 
         row.className = 'folder-label-rule';
@@ -1236,19 +1335,17 @@ function fm_renderFolderLabelRules() {
         folderInput.placeholder = t('settings.folderLabelNamePlaceholder');
         folderInput.setAttribute('aria-label', t('settings.folderLabelNamePlaceholder'));
 
-        labelSelectWrap.className = 'folder-label-select-wrap';
-        swatch.className = 'folder-label-swatch';
-        labelSelect.className = 'folder-label-color';
-        labelSelect.setAttribute('aria-label', t('settings.folderLabelRules'));
-        FM_PREMIERE_LABELS.forEach((label) => {
-            const option = document.createElement('option');
-            option.value = String(label.id);
-            option.textContent = label.name;
-            option.selected = label.id === rule.labelColor;
-            labelSelect.appendChild(option);
+        labelPickerWrap.className = 'folder-label-picker-wrap';
+        labelPickerButton.type = 'button';
+        labelPickerButton.className = 'folder-label-color folder-label-picker-button';
+        labelPickerButton.setAttribute('aria-label', t('settings.folderLabelRules'));
+        labelPickerButton.setAttribute('aria-haspopup', 'listbox');
+        fm_renderFolderLabelPickerButton(labelPickerButton, rule.labelColor);
+        labelPickerButton.addEventListener('click', () => {
+            fm_openFolderLabelPopover(labelPickerButton, labelPickerButton.getAttribute('data-label-color'), (labelColor) => {
+                fm_renderFolderLabelPickerButton(labelPickerButton, labelColor);
+            });
         });
-        labelSelect.addEventListener('change', () => fm_updateFolderLabelSwatch(labelSelect, swatch));
-        fm_updateFolderLabelSwatch(labelSelect, swatch);
 
         removeButton.type = 'button';
         removeButton.className = 'remove-folder-label-rule-btn';
@@ -1262,10 +1359,9 @@ function fm_renderFolderLabelRules() {
             fm_renderFolderLabelRules();
         });
 
-        labelSelectWrap.appendChild(swatch);
-        labelSelectWrap.appendChild(labelSelect);
+        labelPickerWrap.appendChild(labelPickerButton);
         row.appendChild(folderInput);
-        row.appendChild(labelSelectWrap);
+        row.appendChild(labelPickerWrap);
         row.appendChild(removeButton);
         rulesContainer.appendChild(row);
     });
@@ -1276,7 +1372,7 @@ function fm_readFolderLabelRulesFromUI() {
     const ruleRows = document.querySelectorAll('#folderLabelRules .folder-label-rule');
     const rawRules = Array.from(ruleRows).map((row) => ({
         folderName: row.querySelector('.folder-label-name').value,
-        labelColor: row.querySelector('.folder-label-color').value
+        labelColor: row.querySelector('.folder-label-color').getAttribute('data-label-color')
     }));
     return fm_normalizeFolderLabelRules(rawRules);
 }
@@ -2531,6 +2627,8 @@ function openSettings() {
 
 // Close settings
 function closeSettings() {
+    // Close any detached palette when the settings panel is dismissed.
+    fm_closeFolderLabelPopover();
     document.getElementById('settingsPanel').classList.remove('open');
 }
 

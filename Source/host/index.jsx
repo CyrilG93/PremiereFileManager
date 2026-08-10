@@ -81,14 +81,19 @@ function FileManager_getPreferenceValue(propertyName) {
     }
 }
 
-// Convert Premiere's decimal RGB preference value into a CSS color usable by the settings swatch.
+// Convert Premiere's decimal BGR preference value into the RGB CSS color used by the settings swatch.
 function FileManager_labelColorValueToHex(rawColorValue) {
     var numericColor = Number(rawColorValue);
     if (isNaN(numericColor) || numericColor < 0 || numericColor > 16777215) {
         return '';
     }
 
-    var hexColor = Math.floor(numericColor).toString(16);
+    var integerColor = Math.floor(numericColor);
+    var red = integerColor & 255;
+    var green = (integerColor >> 8) & 255;
+    var blue = (integerColor >> 16) & 255;
+    var rgbColor = (red << 16) | (green << 8) | blue;
+    var hexColor = rgbColor.toString(16);
     while (hexColor.length < 6) {
         hexColor = '0' + hexColor;
     }

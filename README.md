@@ -37,7 +37,7 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 
 1. Download the latest release from the [Releases](Releases/) folder
 2. Extract the ZIP file
-3. Run `install_windows.bat` as Administrator
+3. Run `install_windows.bat` (administrator rights are not required)
 4. Restart Adobe Premiere Pro
 5. Open the extension: **Window → Extensions → File Manager**
 
@@ -89,7 +89,7 @@ The **Import** and **Consolidate** commands use the same one-click behavior as c
 
 ## Compatibility
 
-- **Premiere Pro**: CC 2018 and later
+- **Premiere Pro**: 2025 (v25.0) and later
 - **Operating Systems**: macOS 10.12+ and Windows 10+
 
 ## Troubleshooting
@@ -126,7 +126,6 @@ PremiereFileManager/
 │   │   ├── index.html
 │   │   ├── css/
 │   │   ├── js/
-│   │   └── lang/        # Translations (en.json, fr.json)
 │   ├── host/            # ExtendScript (Premiere Pro API)
 │   │   └── index.jsx
 │   ├── CSXS/            # Extension manifest

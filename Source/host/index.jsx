@@ -1,6 +1,84 @@
 // ExtendScript for Adobe// Premiere Pro File Manager Extension - ExtendScript Host
 // This script runs in the Premiere Pro ExtendScript environment
 
+// Provide JSON support when Premiere's shared ExtendScript engine starts without Adobe's JSON globals.
+if (typeof JSON !== 'object') {
+    JSON = {};
+}
+
+if (typeof JSON.stringify !== 'function') {
+    JSON.stringify = function (value) {
+        // Serialize host payloads with the JSON value types used by this extension.
+        function quoteString(input) {
+            return '"' + String(input)
+                .replace(/\\/g, '\\\\')
+                .replace(/"/g, '\\"')
+                .replace(/[\x00-\x1f]/g, function (character) {
+                    // JSON requires every control character to be escaped, including uncommon ones such as vertical tab.
+                    var escapes = {
+                        '\b': '\\b',
+                        '\t': '\\t',
+                        '\n': '\\n',
+                        '\f': '\\f',
+                        '\r': '\\r'
+                    };
+                    var escaped = escapes[character];
+                    if (escaped) return escaped;
+                    var hex = character.charCodeAt(0).toString(16);
+                    return '\\u00' + (hex.length === 1 ? '0' + hex : hex);
+                }) + '"';
+        }
+
+        function serialize(input) {
+            var inputType = typeof input;
+            var index;
+            var items;
+            var key;
+
+            if (input === null) return 'null';
+            if (inputType === 'number') return isFinite(input) ? String(input) : 'null';
+            if (inputType === 'boolean') return input ? 'true' : 'false';
+            if (inputType === 'string') return quoteString(input);
+            if (inputType === 'undefined' || inputType === 'function') return 'null';
+            if (input && typeof input.length === 'number' &&
+                (input.constructor === Array || Object.prototype.toString.call(input) === '[object Array]')) {
+                items = [];
+                for (index = 0; index < input.length; index++) items.push(serialize(input[index]));
+                return '[' + items.join(',') + ']';
+            }
+            if (inputType === 'object') {
+                items = [];
+                for (key in input) {
+                    if (input.hasOwnProperty(key) && typeof input[key] !== 'undefined' && typeof input[key] !== 'function') {
+                        items.push(quoteString(key) + ':' + serialize(input[key]));
+                    }
+                }
+                return '{' + items.join(',') + '}';
+            }
+            return 'null';
+        }
+
+        return serialize(value);
+    };
+}
+
+if (typeof JSON.parse !== 'function') {
+    JSON.parse = function (text) {
+        // Validate JSON structure before evaluation because cache files can be edited outside the extension.
+        var source = String(text || 'null');
+        var safeSource = source
+            .replace(/\\(?:["\\\/bfnrt]|u[0-9a-fA-F]{4})/g, '@')
+            .replace(/"[^"\\\x00-\x1f]*"|true|false|null|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?/g, ']')
+            .replace(/(?:^|:|,)(?:\s*\[)+/g, '');
+
+        if (!/^[\],:{}\s]*$/.test(safeSource)) {
+            throw new Error('Invalid JSON');
+        }
+
+        return eval('(' + source + ')');
+    };
+}
+
 // Platform detection
 var IS_WINDOWS = ($.os.toLowerCase().indexOf('windows') >= 0);
 var IS_MAC = !IS_WINDOWS;
@@ -28,6 +106,7 @@ var FM_LAST_PROJECT_ROOT_FOR_BLACKLIST = '';
 // Incremental scan cache settings
 var FM_SCAN_CACHE_VERSION = 1;
 var FM_SCAN_CACHE_FILENAME = '.premiere-file-manager-scan-cache.json';
+var FM_MAX_BLOCKING_STABILITY_CHECKS_PER_SCAN = 3;
 
 // Host log level configuration
 var FM_LOG_LEVELS = {
@@ -342,7 +421,7 @@ function loadFailedImportsBlacklist(projectRoot) {
     }
 
     try {
-        var blacklistFile = new File(getFailedImportsFilePath(projectRoot));
+        var blacklistFile = FileManager_createFileFromNativePath(getFailedImportsFilePath(projectRoot));
         if (blacklistFile.exists && blacklistFile.open('r')) {
             var content = blacklistFile.read();
             blacklistFile.close();
@@ -380,7 +459,7 @@ function saveFailedImportsBlacklist(projectRoot, entries) {
     }
 
     try {
-        var blacklistFile = new File(getFailedImportsFilePath(projectRoot));
+        var blacklistFile = FileManager_createFileFromNativePath(getFailedImportsFilePath(projectRoot));
         if (!blacklistFile.open('w')) {
             return false;
         }
@@ -406,7 +485,7 @@ function loadScanCache(projectRoot) {
     };
 
     try {
-        var cacheFile = new File(getScanCacheFilePath(projectRoot));
+        var cacheFile = FileManager_createFileFromNativePath(getScanCacheFilePath(projectRoot));
         if (!cacheFile.exists) {
             return defaultCache;
         }
@@ -436,7 +515,7 @@ function loadScanCache(projectRoot) {
 // Save incremental scan cache to disk (best effort)
 function saveScanCache(projectRoot, cacheData) {
     try {
-        var cacheFile = new File(getScanCacheFilePath(projectRoot));
+        var cacheFile = FileManager_createFileFromNativePath(getScanCacheFilePath(projectRoot));
         if (!cacheFile.open('w')) {
             return false;
         }
@@ -650,7 +729,7 @@ function isFileExternal(filePath, projectRoot) {
 
     // fsName often gives a more canonical path on Windows/NAS
     try {
-        var fileFsName = normalizeComparablePath((new File(filePath)).fsName);
+        var fileFsName = normalizeComparablePath(FileManager_createFileFromNativePath(filePath).fsName);
         addCandidate(fileCandidates, fileFsName);
     } catch (e) {
         // Ignore path canonicalization errors
@@ -703,91 +782,6 @@ function isFileExternal(filePath, projectRoot) {
     }
 
     return true;
-}
-
-// Get files that need to be synchronized
-function FileManager_getFilesToSync(rootPath, excludedFoldersJson) {
-    try {
-        var analysisResult = JSON.parse(analyzeProject());
-
-        if (analysisResult.error) {
-            return JSON.stringify(analysisResult);
-        }
-
-        var projectRoot = rootPath || analysisResult.projectRoot;
-        if (!projectRoot) {
-            return JSON.stringify({ error: "Cannot determine project root path" });
-        }
-
-        // Parse excluded folders list
-        var excludedFolders = [];
-        try {
-            if (excludedFoldersJson) {
-                excludedFolders = JSON.parse(excludedFoldersJson);
-            }
-        } catch (e) {
-            // If parsing fails, use empty array
-            excludedFolders = [];
-        }
-
-        var filesToSync = [];
-
-        for (var i = 0; i < analysisResult.files.length; i++) {
-            var file = analysisResult.files[i];
-
-            if (isFileExternal(file.path, projectRoot)) {
-                // Check if file is in an excluded folder
-                var isExcluded = false;
-                if (file.binPath && excludedFolders.length > 0) {
-                    for (var j = 0; j < excludedFolders.length; j++) {
-                        var excludedFolder = excludedFolders[j];
-                        // Check if binPath starts with excluded folder name
-                        if (file.binPath === excludedFolder ||
-                            file.binPath.indexOf(excludedFolder + '/') === 0) {
-                            isExcluded = true;
-                            break;
-                        }
-                    }
-                }
-
-                // Skip if excluded
-                if (isExcluded) {
-                    continue;
-                }
-
-                // Extract filename from full path
-                var sourceFile = new File(file.path);
-                var fileName = decodeURIPath(sourceFile.name);  // Decode filename to prevent %20
-
-                // Build target path properly
-                var targetPath;
-                if (file.binPath && file.binPath !== '') {
-                    // Replace forward slashes with platform-specific separators
-                    var binPathNormalized = file.binPath.replace(/\//g, '/');
-                    targetPath = projectRoot + '/' + binPathNormalized + '/' + fileName;
-                } else {
-                    // File is at root level
-                    targetPath = projectRoot + '/' + fileName;
-                }
-
-                filesToSync.push({
-                    name: fileName,
-                    currentPath: file.path,
-                    binPath: file.binPath,
-                    targetPath: targetPath
-                });
-            }
-        }
-
-        return JSON.stringify({
-            rootPath: FileManager_getProjectRootPath(0), // Default to 0 (same folder as project)
-            filesToSync: filesToSync,
-            totalExternal: filesToSync.length
-        });
-
-    } catch (e) {
-        return JSON.stringify({ error: e.toString() });
-    }
 }
 
 // Relink media after copying
@@ -876,10 +870,11 @@ function FileManager_batchRelinkMedia(relinkList) {
 
         for (var i = 0; i < list.length; i++) {
             var item = list[i];
-            var success = relinkMedia(item.oldPath, item.newPath);
+            var relinkResult = JSON.parse(relinkMedia(item.oldPath, item.newPath));
             results.push({
                 file: item.name,
-                success: success
+                success: relinkResult.success === true,
+                error: relinkResult.error || ''
             });
         }
 
@@ -953,7 +948,7 @@ function FileManager_getFilesToSync(rootPath, excludedFoldersJson, levels) {
                 }
 
                 // Extract filename from full path
-                var sourceFile = new File(file.path);
+                var sourceFile = FileManager_createFileFromNativePath(file.path);
                 var fileName = decodeURIPath(sourceFile.name);  // Decode filename to prevent %20
 
                 // Build target path properly
@@ -1231,12 +1226,39 @@ function detectCameraStructure(binPath) {
     return info;
 }
 
-// Recursively scan folder for all media files
+// Resolve a stable folder identity so aliases, symlinks, and junctions cannot create scan cycles.
+function FileManager_getFolderScanKey(folder) {
+    try {
+        var resolvedFolder = (folder && typeof folder.resolve === 'function') ? folder.resolve() : folder;
+        return normalizePathKey((resolvedFolder && resolvedFolder.fsName) || (folder && folder.fsName) || '');
+    } catch (e) {
+        return normalizePathKey((folder && folder.fsName) || '');
+    }
+}
+
+// Scan folders iteratively to avoid stack overflows and skip previously visited real folders.
 function scanFolder(folder, fileList, currentPath, bannedExtensionsLookup, excludedFolderNamesLookup) {
     if (!folder || !folder.exists) return;
 
-    try {
-        var files = folder.getFiles();
+    var pendingFolders = [{ folder: folder, relativePath: currentPath || '' }];
+    var visitedFolders = {};
+    while (pendingFolders.length > 0) {
+        var pendingFolder = pendingFolders.pop();
+        var folderKey = FileManager_getFolderScanKey(pendingFolder.folder);
+        if (folderKey && visitedFolders[folderKey] === true) {
+            logPlatform('Skipping already scanned folder link: ' + pendingFolder.folder.fsName, 'debug');
+            continue;
+        }
+        if (folderKey) visitedFolders[folderKey] = true;
+
+        var files = [];
+        try {
+            files = pendingFolder.folder.getFiles();
+        } catch (folderError) {
+            // Skip folders that cannot be listed because of permissions or a disconnected volume.
+            continue;
+        }
+
         for (var i = 0; i < files.length; i++) {
             try {
                 var item = files[i];
@@ -1249,9 +1271,9 @@ function scanFolder(folder, fileList, currentPath, bannedExtensionsLookup, exclu
                         excludedFolderNamesLookup[folderNameLower] === true;
 
                     if (!isExcludedName) {
-                        // Recursively scan subfolder
-                        var subPath = currentPath ? (currentPath + '/' + folderName) : folderName;
-                        scanFolder(item, fileList, subPath, bannedExtensionsLookup, excludedFolderNamesLookup);
+                        // Queue child folders instead of recursing so deep directory trees remain safe.
+                        var subPath = pendingFolder.relativePath ? (pendingFolder.relativePath + '/' + folderName) : folderName;
+                        pendingFolders.push({ folder: item, relativePath: subPath });
                     }
                 } else if (item instanceof File) {
                     // Skip system files by name
@@ -1269,7 +1291,7 @@ function scanFolder(folder, fileList, currentPath, bannedExtensionsLookup, exclu
                     var isBanned = bannedExtensionsLookup[ext] === true;
 
                     // Detect known camera structures to flatten technical folders
-                    var cameraInfo = detectCameraStructure(currentPath || '');
+                    var cameraInfo = detectCameraStructure(pendingFolder.relativePath || '');
 
                     // In camera folders, import only true media files and skip sidecar/metadata files
                     if (cameraInfo.isCameraStructure && !isExtensionAllowed(ext, cameraInfo.allowedExtensions)) {
@@ -1280,8 +1302,8 @@ function scanFolder(folder, fileList, currentPath, bannedExtensionsLookup, exclu
                         fileList.push({
                             name: fileName,
                             path: decodeURIPath(item.fsName),  // Decode file path
-                            sourceFolderPath: currentPath || '', // Preserve the real source folders even when camera bins are flattened
-                            binPath: cameraInfo.isCameraStructure ? cameraInfo.normalizedBinPath : (currentPath || ''),
+                            sourceFolderPath: pendingFolder.relativePath || '', // Preserve the real source folders even when camera bins are flattened
+                            binPath: cameraInfo.isCameraStructure ? cameraInfo.normalizedBinPath : (pendingFolder.relativePath || ''),
                             size: item.length || 0,
                             modified: item.modified ? item.modified.getTime() : 0
                         });
@@ -1292,9 +1314,6 @@ function scanFolder(folder, fileList, currentPath, bannedExtensionsLookup, exclu
                 continue;
             }
         }
-    } catch (e) {
-        // Skip folders that cause errors
-        return;
     }
 }
 
@@ -1320,7 +1339,7 @@ function isFileStable(filePath) {
         }
 
         // Check 1: Try to open file exclusively (detects if file is locked)
-        var testFile = new File(filePath);
+        var testFile = FileManager_createFileFromNativePath(filePath);
         if (!testFile.exists) {
             return false;
         }
@@ -1364,7 +1383,7 @@ function isFileStable(filePath) {
         $.sleep(PLATFORM_CONFIG.fileStabilityWait);
 
         // Check 3: Verify size and modification time haven't changed
-        testFile = new File(filePath);
+        testFile = FileManager_createFileFromNativePath(filePath);
         if (!testFile.exists) {
             return false;
         }
@@ -1392,7 +1411,7 @@ function isFileStable(filePath) {
             logPlatform('File very recent, running extra stability pass: ' + filePath, 'debug');
             $.sleep(PLATFORM_CONFIG.fileStabilityWait);
 
-            testFile = new File(filePath);
+            testFile = FileManager_createFileFromNativePath(filePath);
             if (!testFile.exists) {
                 return false;
             }
@@ -1523,7 +1542,7 @@ function getProjectFilesIndex(projectRoot) {
                     index.relativePathLookup[relativePath] = true;
 
                     // Build robust signature fallback (name + size + mtime)
-                    var mediaFile = new File(mediaPath);
+                    var mediaFile = FileManager_createFileFromNativePath(mediaPath);
                     var mediaSize = -1;
                     var mediaModified = 0;
 
@@ -1662,6 +1681,7 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
         var cacheHits = 0;
         var stableChecks = 0;
         var stableChecksSkipped = 0;
+        var stabilityChecksDeferred = 0;
         var dedupeSkippedByPath = 0;
         var dedupeSkippedBySignature = 0;
 
@@ -1781,6 +1801,12 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
             if (cacheHit && cacheEntry.stable === true && cacheEntry.decision === 'stable') {
                 stable = true;
                 stableChecksSkipped++;
+            } else if (stableChecks >= FM_MAX_BLOCKING_STABILITY_CHECKS_PER_SCAN) {
+                // Defer additional recent files to the next scan instead of blocking Premiere for minutes.
+                stabilityChecksDeferred++;
+                logPlatform('Deferring stability check until next scan: ' + relativeFilePath, 'debug');
+                updateScanCacheEntry(normalizedAbsolutePath, fingerprint, relativeFilePath, 'stability_deferred', false, file);
+                continue;
             } else {
                 stableChecks++;
                 stable = isFileStable(file.path);
@@ -1842,6 +1868,7 @@ function FileManager_scanForNewFiles(rootPath, excludedFoldersJson, bannedExtens
                 cacheHits: cacheHits,
                 stableChecks: stableChecks,
                 stableChecksSkipped: stableChecksSkipped,
+                stabilityChecksDeferred: stabilityChecksDeferred,
                 dedupeSkippedByPath: dedupeSkippedByPath,
                 dedupeSkippedBySignature: dedupeSkippedBySignature,
                 removedCacheEntries: removedCacheEntries,
@@ -1981,6 +2008,18 @@ function FileManager_findProjectItemByMediaPath(nativePath, mediaName) {
     return FileManager_findProjectItemRecursively(app.project.rootItem, nativePath, mediaName);
 }
 
+// Build a File from an operating-system path while preserving literal percent signs on ExtendScript hosts.
+function FileManager_createFileFromNativePath(filePath) {
+    var nativePath = String(filePath || '');
+    return nativePath.indexOf('%') >= 0 ? new File(File.encode(nativePath)) : new File(nativePath);
+}
+
+// Keep ordinary import paths unchanged while handing Premiere the native fsName for literal-percent paths.
+function FileManager_getPremiereImportPath(filePath) {
+    var fileObject = FileManager_createFileFromNativePath(filePath);
+    return String(filePath || '').indexOf('%') >= 0 ? fileObject.fsName : String(filePath || '');
+}
+
 // Import files to project
 function FileManager_importFilesToProject(filesJson) {
     try {
@@ -2004,9 +2043,10 @@ function FileManager_importFilesToProject(filesJson) {
         function recordSuccess(file, index) {
             var labelApplied = false;
             var numericLabelColor = Number(file.labelColor);
+            var premiereImportPath = FileManager_getPremiereImportPath(file.path);
 
             if (!isNaN(numericLabelColor) && numericLabelColor >= 0 && numericLabelColor <= 15) {
-                var importedProjectItem = FileManager_findProjectItemByMediaPath(file.path, file.name);
+                var importedProjectItem = FileManager_findProjectItemByMediaPath(premiereImportPath, file.name);
                 labelApplied = FileManager_applyProjectItemLabel(importedProjectItem, numericLabelColor, file.name);
             }
 
@@ -2045,7 +2085,7 @@ function FileManager_importFilesToProject(filesJson) {
         // Import one file into a resolved bin
         function importSingleFile(file, index, targetBin) {
             try {
-                var singleResult = app.project.importFiles([file.path], true, targetBin, false);
+                var singleResult = app.project.importFiles([FileManager_getPremiereImportPath(file.path)], true, targetBin, false);
                 if (singleResult === false) {
                     recordFailure(file, index, 'Import returned false');
                 } else {
@@ -2068,7 +2108,7 @@ function FileManager_importFilesToProject(filesJson) {
                 return true;
             }
 
-            var sourceFile = new File(file.path);
+            var sourceFile = FileManager_createFileFromNativePath(file.path);
             var size = -1;
             var modified = 0;
             if (sourceFile && sourceFile.exists) {
@@ -2094,7 +2134,7 @@ function FileManager_importFilesToProject(filesJson) {
                 continue;
             }
 
-            var sourceFile = new File(file.path);
+            var sourceFile = FileManager_createFileFromNativePath(file.path);
             if (!sourceFile.exists) {
                 resultsByIndex[i] = {
                     name: file.name,
@@ -2138,7 +2178,7 @@ function FileManager_importFilesToProject(filesJson) {
 
             var batchPaths = [];
             for (var bp = 0; bp < groupItems.length; bp++) {
-                batchPaths.push(groupItems[bp].file.path);
+                batchPaths.push(FileManager_getPremiereImportPath(groupItems[bp].file.path));
             }
 
             var batchFailed = false;
@@ -2248,7 +2288,7 @@ function base64Decode(str) {
     // Decode UTF-8
     var result = '';
     var i = 0;
-    var c1, c2, c3;
+    var c1, c2, c3, c4, codePoint;
 
     while (i < output.length) {
         c1 = output.charCodeAt(i);
@@ -2260,6 +2300,16 @@ function base64Decode(str) {
             c2 = output.charCodeAt(i + 1);
             result += String.fromCharCode(((c1 & 31) << 6) | (c2 & 63));
             i += 2;
+        } else if ((c1 > 239) && (c1 < 248)) {
+            // Convert UTF-8 four-byte sequences into the UTF-16 surrogate pair used by ExtendScript strings.
+            c2 = output.charCodeAt(i + 1);
+            c3 = output.charCodeAt(i + 2);
+            c4 = output.charCodeAt(i + 3);
+            codePoint = ((c1 & 7) << 18) | ((c2 & 63) << 12) | ((c3 & 63) << 6) | (c4 & 63);
+            codePoint -= 65536;
+            result += String.fromCharCode(55296 + (codePoint >> 10));
+            result += String.fromCharCode(56320 + (codePoint & 1023));
+            i += 4;
         } else {
             c2 = output.charCodeAt(i + 1);
             c3 = output.charCodeAt(i + 2);

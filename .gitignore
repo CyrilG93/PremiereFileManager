@@ -50,6 +50,9 @@ Backups/
 *.swp
 *.swo
 
+# CEP remote-debug configuration is for local development only.
+.debug
+
 # Node modules (if any)
 node_modules/
 

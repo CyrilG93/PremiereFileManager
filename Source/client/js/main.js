@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.4.3';
+let CURRENT_VERSION = '1.4.4';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -1387,7 +1387,7 @@ function fm_applyHostLogLevel(level) {
     const normalized = fm_normalizeHostLogLevel(level);
     settings.hostLogLevel = normalized;
 
-    csInterface.evalScript(`FileManager_setLogLevel("${normalized}")`, (result) => {
+    csInterface.evalScript(fm_buildHostCall('FileManager_setLogLevel', [normalized]), (result) => {
         if (!result || result === 'EvalScript error.') {
             console.warn('Host log level update failed:', normalized);
             return;
@@ -1785,7 +1785,7 @@ function updateProgress(percent, message) {
 function getProjectInfo() {
     const levels = (typeof settings.rootFolderLevels === 'number') ? settings.rootFolderLevels : 0;
     console.log('getProjectInfo called with levels:', levels);
-    csInterface.evalScript(`FileManager_getProjectInfo(${levels})`, (result) => {
+    csInterface.evalScript(fm_buildHostCall('FileManager_getProjectInfo', [levels]), (result) => {
         try {
             const info = JSON.parse(result);
 
@@ -1827,7 +1827,7 @@ function analyzeAll() {
         updateProgress(0, 'Analyse en cours...');
 
         // Use the EXACT same approach as auto-import which works
-        const rootPath = (settings.rootFolder || '').replace(/\\/g, '\\\\'); // Escape backslashes for Windows
+        const rootPath = settings.rootFolder || ''; // The shared host-call builder escapes paths safely for ExtendScript.
         const levels = settings.rootFolderLevels || 0;
         const excludedFolders = JSON.stringify(settings.excludedFolders || []);
         const bannedExtensions = JSON.stringify(settings.bannedExtensions || []);
@@ -1835,7 +1835,7 @@ function analyzeAll() {
 
         console.log('Preparing import script...');
         // First, scan for import files (same as auto-import)
-        const importScript = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
+        const importScript = fm_buildHostCall('FileManager_scanForNewFiles', [rootPath, excludedFolders, bannedExtensions, excludedFolderNames, levels]);
 
         console.log('PROJECT ROOT FOR IMPORT:', rootPath);
         console.log('Calling evalScript for import...');
@@ -1933,7 +1933,7 @@ function analyzeAll() {
             updateProgress(50, 'Scan export...');
 
             // Then scan for export files
-            const exportScript = `FileManager_getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`;
+            const exportScript = fm_buildHostCall('FileManager_getFilesToSync', [rootPath, excludedFolders, levels]);
 
             console.log('Calling evalScript for export...');
             csInterface.evalScript(exportScript, (exportResult) => {
@@ -2148,7 +2148,7 @@ async function exportSelected() {
             if (relinkList.length > 0) {
                 await new Promise((resolve) => {
                     const relinkJson = JSON.stringify(relinkList);
-                    csInterface.evalScript(`FileManager_batchRelinkMedia('${relinkJson}')`, (result) => {
+                    csInterface.evalScript(fm_buildHostCall('FileManager_batchRelinkMedia', [relinkJson]), (result) => {
                         console.log('Relink result:', result);
                         resolve();
                     });
@@ -2478,19 +2478,6 @@ function toggleDebugLogsSection() {
     }
 }
 
-// Update file counts
-function updateImportCount() {
-    const checked = document.querySelectorAll('#importFilesList input[type="checkbox"]:checked').length;
-    document.getElementById('importCount').textContent = checked;
-    document.getElementById('importBtn').disabled = checked === 0;
-}
-
-function updateExportCount() {
-    const checked = document.querySelectorAll('#exportFilesList input[type="checkbox"]:checked').length;
-    document.getElementById('exportCount').textContent = checked;
-    document.getElementById('exportBtn').disabled = checked === 0;
-}
-
 // Selection controls for import
 function selectAllImport() {
     document.querySelectorAll('#importFilesList input[type="checkbox"]').forEach(cb => cb.checked = true);
@@ -2559,7 +2546,7 @@ async function synchronizeFiles() {
 
             if (relinkList.length > 0) {
                 await new Promise((resolve) => {
-                    csInterface.evalScript(`FileManager_batchRelinkMedia('${JSON.stringify(relinkList)}')`, (result) => {
+                    csInterface.evalScript(fm_buildHostCall('FileManager_batchRelinkMedia', [JSON.stringify(relinkList)]), (result) => {
                         resolve();
                     });
                 });
@@ -2652,9 +2639,7 @@ async function compactSync() {
     const rootPath = settings.rootFolder || '';
     const levels = settings.rootFolderLevels || 0;
     const excludedFolders = JSON.stringify(settings.excludedFolders || []);
-    const scriptCall = rootPath
-        ? `FileManager_getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`
-        : `FileManager_getFilesToSync('', '${excludedFolders}', ${levels})`;
+    const scriptCall = fm_buildHostCall('FileManager_getFilesToSync', [rootPath, excludedFolders, levels]);
 
     csInterface.evalScript(scriptCall, async (result) => {
         try {
@@ -2702,7 +2687,7 @@ async function compactSync() {
 
                 if (relinkList.length > 0) {
                     await new Promise((resolve) => {
-                        csInterface.evalScript(`FileManager_batchRelinkMedia('${JSON.stringify(relinkList)}')`, () => {
+                        csInterface.evalScript(fm_buildHostCall('FileManager_batchRelinkMedia', [JSON.stringify(relinkList)]), () => {
                             resolve();
                         });
                     });
@@ -2746,6 +2731,15 @@ function fm_evalScriptPromise(script) {
     });
 }
 
+// Serialize every host argument as a JavaScript literal so apostrophes, quotes, and backslashes cannot break evalScript.
+function fm_buildHostCall(functionName, args) {
+    const serializedArgs = (args || []).map((arg) => {
+        const serializedValue = JSON.stringify(arg);
+        return serializedValue === undefined ? 'null' : serializedValue;
+    });
+    return `${functionName}(${serializedArgs.join(', ')})`;
+}
+
 async function fm_importFilesInBatches(filesToImport, options = {}) {
     const batchSize = options.batchSize || FM_IMPORT_BATCH_SIZE;
     const contextLabel = options.contextLabel || 'import';
@@ -2758,7 +2752,7 @@ async function fm_importFilesInBatches(filesToImport, options = {}) {
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
         const batch = batches[batchIndex];
         const base64Data = btoa(unescape(encodeURIComponent(JSON.stringify(batch))));
-        const rawResult = await fm_evalScriptPromise(`FileManager_importFilesToProjectBase64('${base64Data}')`);
+        const rawResult = await fm_evalScriptPromise(fm_buildHostCall('FileManager_importFilesToProjectBase64', [base64Data]));
 
         let parsed;
         try {
@@ -2803,12 +2797,12 @@ async function compactImport() {
 
     compactImportBtn.disabled = true;
 
-    const rootPath = (settings.rootFolder || '').replace(/\\/g, '\\\\');
+    const rootPath = settings.rootFolder || '';
     const levels = settings.rootFolderLevels || 0;
     const excludedFolders = JSON.stringify(settings.excludedFolders || []);
     const bannedExtensions = JSON.stringify(settings.bannedExtensions || []);
     const excludedFolderNames = JSON.stringify(settings.excludedFolderNames || []);
-    const importScript = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
+    const importScript = fm_buildHostCall('FileManager_scanForNewFiles', [rootPath, excludedFolders, bannedExtensions, excludedFolderNames, levels]);
 
     csInterface.evalScript(importScript, async (importResult) => {
         try {
@@ -2844,10 +2838,10 @@ async function compactExport() {
 
     compactExportBtn.disabled = true;
 
-    const rootPath = (settings.rootFolder || '').replace(/\\/g, '\\\\');
+    const rootPath = settings.rootFolder || '';
     const levels = settings.rootFolderLevels || 0;
     const excludedFolders = JSON.stringify(settings.excludedFolders || []);
-    const exportScript = `FileManager_getFilesToSync("${rootPath}", '${excludedFolders}', ${levels})`;
+    const exportScript = fm_buildHostCall('FileManager_getFilesToSync', [rootPath, excludedFolders, levels]);
 
     csInterface.evalScript(exportScript, async (exportResult) => {
         try {
@@ -2893,7 +2887,7 @@ async function compactExport() {
                 if (relinkList.length > 0) {
                     await new Promise((resolve) => {
                         const relinkJson = JSON.stringify(relinkList);
-                        csInterface.evalScript(`FileManager_batchRelinkMedia('${relinkJson}')`, () => resolve());
+                        csInterface.evalScript(fm_buildHostCall('FileManager_batchRelinkMedia', [relinkJson]), () => resolve());
                     });
                 }
             }
@@ -2921,7 +2915,7 @@ function analyzeForImport() {
     const excludedFolders = JSON.stringify(settings.excludedFolders || []);
     const bannedExtensions = JSON.stringify(settings.bannedExtensions || []);
     const excludedFolderNames = JSON.stringify(settings.excludedFolderNames || []);
-    const scriptCall = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
+    const scriptCall = fm_buildHostCall('FileManager_scanForNewFiles', [rootPath, excludedFolders, bannedExtensions, excludedFolderNames, levels]);
 
     csInterface.evalScript(scriptCall, (result) => {
         try {
@@ -3054,13 +3048,13 @@ function startAutoImport() {
         isImporting = true;
 
         try {
-            const rootPath = (settings.rootFolder || '').replace(/\\/g, '\\\\');
+            const rootPath = settings.rootFolder || '';
             const levels = settings.rootFolderLevels || 0;
             const excludedFolders = JSON.stringify(settings.excludedFolders || []);
             const bannedExtensions = JSON.stringify(settings.bannedExtensions || []);
             const excludedFolderNames = JSON.stringify(settings.excludedFolderNames || []);
 
-            const scanScript = `FileManager_scanForNewFiles("${rootPath}", '${excludedFolders}', '${bannedExtensions}', '${excludedFolderNames}', ${levels})`;
+            const scanScript = fm_buildHostCall('FileManager_scanForNewFiles', [rootPath, excludedFolders, bannedExtensions, excludedFolderNames, levels]);
 
             csInterface.evalScript(scanScript, async (result) => {
                 try {

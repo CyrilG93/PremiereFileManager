@@ -116,36 +116,9 @@ If you're still experiencing this issue:
 2. Verify the Auto-Import Interval is set correctly in Settings
 3. Make sure files are not in excluded folders or have banned extensions
 
-## Development
-
-### Project Structure
-
-```
-PremiereFileManager/
-├── client/              # UI and client-side logic
-│   ├── index.html
-│   ├── css/
-│   └── js/
-├── host/                # ExtendScript (Premiere Pro API)
-│   └── index.jsx
-├── CSXS/                # Extension manifest
-│   └── manifest.xml
-├── install_macos.sh
-├── install_windows.bat
-└── Releases/            # Packaged releases
-```
-
-## License
-
-This project is provided as-is for use with Adobe Premiere Pro.
-
 ## Support
 
 For issues, questions, or feature requests, please send me a message on Discord.
-
-## Credits
-
-Developed by CyrilG93.
 
 ## Changelog
 

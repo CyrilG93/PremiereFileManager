@@ -69,6 +69,51 @@ function FileManager_setLogLevel(level) {
     }
 }
 
+// Read one Premiere preference safely so unavailable label preferences never interrupt the panel.
+function FileManager_getPreferenceValue(propertyName) {
+    try {
+        if (!app.properties || !app.properties.doesPropertyExist(propertyName)) {
+            return '';
+        }
+        return String(app.properties.getProperty(propertyName) || '');
+    } catch (e) {
+        return '';
+    }
+}
+
+// Convert Premiere's decimal RGB preference value into a CSS color usable by the settings swatch.
+function FileManager_labelColorValueToHex(rawColorValue) {
+    var numericColor = Number(rawColorValue);
+    if (isNaN(numericColor) || numericColor < 0 || numericColor > 16777215) {
+        return '';
+    }
+
+    var hexColor = Math.floor(numericColor).toString(16);
+    while (hexColor.length < 6) {
+        hexColor = '0' + hexColor;
+    }
+    return '#' + hexColor;
+}
+
+// Return the active user's 16 Premiere label names and colors for the settings editor.
+function FileManager_getPremiereLabelDefinitions() {
+    try {
+        var labels = [];
+        for (var labelIndex = 0; labelIndex < 16; labelIndex++) {
+            labels.push({
+                id: labelIndex,
+                name: FileManager_getPreferenceValue('BE.Prefs.LabelNames.' + labelIndex),
+                color: FileManager_labelColorValueToHex(
+                    FileManager_getPreferenceValue('BE.Prefs.LabelColors.' + labelIndex)
+                )
+            });
+        }
+        return JSON.stringify({ labels: labels });
+    } catch (e) {
+        return JSON.stringify({ error: e.toString(), labels: [] });
+    }
+}
+
 // Helper function to decode URI-encoded paths (e.g., %20 -> space)
 function decodeURIPath(path) {
     if (!path) return path;
@@ -1230,6 +1275,7 @@ function scanFolder(folder, fileList, currentPath, bannedExtensionsLookup, exclu
                         fileList.push({
                             name: fileName,
                             path: decodeURIPath(item.fsName),  // Decode file path
+                            sourceFolderPath: currentPath || '', // Preserve the real source folders even when camera bins are flattened
                             binPath: cameraInfo.isCameraStructure ? cameraInfo.normalizedBinPath : (currentPath || ''),
                             size: item.length || 0,
                             modified: item.modified ? item.modified.getTime() : 0
@@ -1850,6 +1896,86 @@ function getOrCreateBin(binPath) {
     return currentBin;
 }
 
+// Apply one valid Premiere label index without allowing a label failure to block a media import.
+function FileManager_applyProjectItemLabel(projectItem, labelColor, itemDescription) {
+    var numericLabelColor = Number(labelColor);
+    if (!projectItem || isNaN(numericLabelColor) || numericLabelColor < 0 || numericLabelColor > 15) {
+        return false;
+    }
+
+    try {
+        var result = projectItem.setColorLabel(Math.floor(numericLabelColor));
+        if (result === 0) {
+            logPlatform('Applied label ' + numericLabelColor + ' to media ' + itemDescription);
+            return true;
+        }
+        logPlatform('Premiere rejected label ' + numericLabelColor + ' for media ' + itemDescription, 'warn');
+    } catch (e) {
+        logPlatform('Unable to apply label to media ' + itemDescription + ': ' + e.toString(), 'warn');
+    }
+
+    return false;
+}
+
+// Walk project bins when the host cannot resolve an imported item through its native media-path lookup.
+function FileManager_findProjectItemRecursively(parentItem, nativePath, mediaName) {
+    if (!parentItem || !parentItem.children) {
+        return null;
+    }
+
+    var targetPath = normalizeComparablePath(nativePath);
+    var targetName = String(mediaName || '').toLowerCase();
+    for (var i = 0; i < parentItem.children.numItems; i++) {
+        var child = parentItem.children[i];
+        if (!child) {
+            continue;
+        }
+
+        var childPath = '';
+        try {
+            childPath = typeof child.getMediaPath === 'function' ? child.getMediaPath() : '';
+        } catch (pathError) {
+            childPath = '';
+        }
+
+        var normalizedChildPath = normalizeComparablePath(childPath);
+        if (targetPath && normalizedChildPath === targetPath) {
+            return child;
+        }
+
+        var childName = '';
+        try {
+            childName = String(child.name || '').toLowerCase();
+        } catch (nameError) {
+            childName = '';
+        }
+        if (targetName && childName === targetName && (!normalizedChildPath || normalizedChildPath === targetPath)) {
+            return child;
+        }
+
+        var nestedMatch = FileManager_findProjectItemRecursively(child, nativePath, mediaName);
+        if (nestedMatch) {
+            return nestedMatch;
+        }
+    }
+
+    return null;
+}
+
+// Find a newly imported project item by media path, with a recursive fallback for older Premiere hosts.
+function FileManager_findProjectItemByMediaPath(nativePath, mediaName) {
+    try {
+        var matches = app.project.rootItem.findItemsMatchingMediaPath(nativePath, 1);
+        if (matches && matches.length > 0) {
+            return matches[0];
+        }
+    } catch (e) {
+        logPlatform('Native media-path lookup unavailable: ' + e.toString(), 'debug');
+    }
+
+    return FileManager_findProjectItemRecursively(app.project.rootItem, nativePath, mediaName);
+}
+
 // Import files to project
 function FileManager_importFilesToProject(filesJson) {
     try {
@@ -1869,12 +1995,21 @@ function FileManager_importFilesToProject(filesJson) {
             loadFailedImportsBlacklist(blacklistRoot);
         }
 
-        // Record one success result with stable shape
+        // Record one success result and apply the optional source-folder label after the media exists in Premiere.
         function recordSuccess(file, index) {
+            var labelApplied = false;
+            var numericLabelColor = Number(file.labelColor);
+
+            if (!isNaN(numericLabelColor) && numericLabelColor >= 0 && numericLabelColor <= 15) {
+                var importedProjectItem = FileManager_findProjectItemByMediaPath(file.path, file.name);
+                labelApplied = FileManager_applyProjectItemLabel(importedProjectItem, numericLabelColor, file.name);
+            }
+
             resultsByIndex[index] = {
                 name: file.name,
                 success: true,
-                binPath: file.binPath
+                binPath: file.binPath,
+                labelApplied: labelApplied
             };
         }
 

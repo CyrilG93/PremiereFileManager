@@ -280,6 +280,13 @@
                         placeholder="Ex: .zip, .pptx, .exe&#10;Une extension par ligne"></textarea>
                 </div>
                 <div class="setting-item">
+                    <label data-i18n="settings.folderLabelRules">Labels Premiere par dossier source</label>
+                    <p class="setting-description" data-i18n="settings.folderLabelRulesHelp">Applique un label aux médias venant d'un dossier portant ce nom. Si plusieurs dossiers correspondent, le plus proche du fichier est utilisé.</p>
+                    <!-- Dynamic rows keep the folder-name-to-label rules easy to edit in the settings panel. -->
+                    <div class="folder-label-rules" id="folderLabelRules"></div>
+                    <button class="secondary-btn add-folder-label-rule-btn" id="addFolderLabelRuleBtn" type="button" data-i18n="buttons.addFolderLabelRule">Ajouter une règle</button>
+                </div>
+                <div class="setting-item">
                     <label>
                         <input type="checkbox" id="autoImport" />
                         <span data-i18n="settings.autoImport">Import automatique</span>

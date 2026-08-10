@@ -82,6 +82,7 @@ The **Import** and **Consolidate** commands use the same one-click behavior as c
 - **Excluded Folders**: Folders to ignore during consolidation
 - **Excluded Folder Names**: Folder names to exclude (e.g., "Backup", "Archive")
 - **Banned Extensions**: File types to never import
+- **Premiere Labels by Source Folder**: Assign a Premiere label to media coming from a folder name; when nested folders match, the closest folder to the file takes priority
 - **Auto-Import**: Enable automatic scanning
 - **Auto-Import Interval**: How often to scan (in seconds)
 - **Version Badge**: In full mode, click the version badge next to the title to open the File Manager product page

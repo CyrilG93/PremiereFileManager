@@ -1091,6 +1091,78 @@ button svg {
     cursor: pointer;
 }
 
+/* Keep folder-label rules compact while leaving room for translated Premiere label names. */
+.folder-label-rules {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.folder-label-rule {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(110px, 0.8fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.folder-label-rule input,
+.folder-label-rule select {
+    min-width: 0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text-primary);
+    font: inherit;
+}
+
+.folder-label-rule input:focus,
+.folder-label-rule select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+}
+
+.folder-label-select-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.folder-label-select-wrap select {
+    flex: 1;
+}
+
+.folder-label-swatch {
+    width: 12px;
+    height: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 50%;
+    flex: 0 0 auto;
+}
+
+.remove-folder-label-rule-btn {
+    width: 30px;
+    height: 30px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 18px;
+    line-height: 1;
+}
+
+.remove-folder-label-rule-btn:hover {
+    border-color: var(--error);
+    color: var(--error);
+}
+
+.add-folder-label-rule-btn {
+    align-self: flex-start;
+}
+
 .save-settings-btn {
     background: var(--accent-primary);
     color: white;

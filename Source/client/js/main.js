@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.4.1';
+let CURRENT_VERSION = '1.4.2';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -197,7 +197,10 @@ const baseTranslations = {
         excludedFolderNames: "Folder names to ignore on import",
         excludedFolderNamesPlaceholder: "Ex: node_modules, .git, Thumbs.db",
         bannedExtensions: "File extensions banned from import",
-        bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nOne extension per line"
+        bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nOne extension per line",
+        folderLabelRules: "Premiere labels by source folder",
+        folderLabelRulesHelp: "Apply a label to media from a folder with this name. When several folders match, the closest folder to the file wins.",
+        folderLabelNamePlaceholder: "Folder name (e.g. MUSIC)"
     },
     buttons: {
         analyze: "Analyze",
@@ -209,7 +212,9 @@ const baseTranslations = {
         selectAllImport: "All",
         deselectAllImport: "None",
         selectAllExport: "All",
-        deselectAllExport: "None"
+        deselectAllExport: "None",
+        addFolderLabelRule: "Add rule",
+        removeFolderLabelRule: "Remove rule"
     },
     compact: {
         import: "Import",
@@ -446,7 +451,10 @@ const translations = {
             excludedFolderNames: "Noms de dossiers à ignorer à l'import",
             excludedFolderNamesPlaceholder: "Ex: node_modules, .git, Thumbs.db",
             bannedExtensions: "Extensions de fichiers bannies à l'import",
-            bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nUne extension par ligne"
+            bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nUne extension par ligne",
+            folderLabelRules: "Labels Premiere par dossier source",
+            folderLabelRulesHelp: "Applique un label aux médias venant d'un dossier portant ce nom. Si plusieurs dossiers correspondent, le plus proche du fichier est utilisé.",
+            folderLabelNamePlaceholder: "Nom du dossier (ex. MUSIQUE)"
         },
         buttons: {
             analyze: "Analyser",
@@ -458,7 +466,9 @@ const translations = {
             selectAllImport: "Tout",
             deselectAllImport: "Aucun",
             selectAllExport: "Tout",
-            deselectAllExport: "Aucun"
+            deselectAllExport: "Aucun",
+            addFolderLabelRule: "Ajouter une règle",
+            removeFolderLabelRule: "Supprimer la règle"
         },
         compact: {
             import: "Importer",
@@ -979,8 +989,13 @@ function updateUILanguage() {
 // Change language
 function changeLanguage(lang) {
     if (translations[lang]) {
+        // Keep editable label rows before re-rendering their translated placeholders and button labels.
+        if (document.getElementById('folderLabelRules')) {
+            settings.folderLabelRules = fm_readFolderLabelRulesFromUI();
+        }
         currentLang = lang;
         updateUILanguage();
+        fm_renderFolderLabelRules();
 
         // Save to settings
         settings.language = lang;
@@ -1050,6 +1065,7 @@ let settings = {
     autoRelink: true,
     excludedFolders: [],
     excludedFolderNames: ['Premiere Pro Auto-Save', 'Adobe Premiere Pro Auto-Save'],
+    folderLabelRules: [], // Map source folder names to Premiere's fixed label indexes
     bannedExtensions: FM_DEFAULT_BANNED_EXTENSIONS.slice(),
     autoImport: false,
     autoImportInterval: 30,
@@ -1059,6 +1075,211 @@ let settings = {
 
 // Accepted host log levels mirrored from ExtendScript host script
 const FM_ALLOWED_HOST_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
+
+// Keep a safe fallback palette until Premiere returns the user's configured label names and colors.
+const FM_DEFAULT_PREMIERE_LABELS = [
+    { id: 0, name: 'Violet', color: '#a78bfa' },
+    { id: 1, name: 'Iris', color: '#6b9bd2' },
+    { id: 2, name: 'Caribbean', color: '#37d5ae' },
+    { id: 3, name: 'Lavender', color: '#d57ce4' },
+    { id: 4, name: 'Cerulean', color: '#32b8d7' },
+    { id: 5, name: 'Forest', color: '#51b85a' },
+    { id: 6, name: 'Rose', color: '#ed6397' },
+    { id: 7, name: 'Mango', color: '#f6ad3d' },
+    { id: 8, name: 'Purple', color: '#ad00a8' },
+    { id: 9, name: 'Blue', color: '#4245ff' },
+    { id: 10, name: 'Teal', color: '#008e97' },
+    { id: 11, name: 'Magenta', color: '#db32d5' },
+    { id: 12, name: 'Tan', color: '#c9bd89' },
+    { id: 13, name: 'Green', color: '#247d2b' },
+    { id: 14, name: 'Brown', color: '#995018' },
+    { id: 15, name: 'Yellow', color: '#e6e65c' }
+];
+let FM_PREMIERE_LABELS = FM_DEFAULT_PREMIERE_LABELS.slice();
+
+// Accept only Premiere's fixed label indexes before values reach the host script.
+function fm_normalizeLabelColor(rawLabelColor) {
+    const labelColor = Number(rawLabelColor);
+    return Number.isInteger(labelColor) && labelColor >= 0 && labelColor < FM_PREMIERE_LABELS.length
+        ? labelColor
+        : null;
+}
+
+// Normalize persisted rules and keep the most recently saved rule for each source folder name.
+function fm_normalizeFolderLabelRules(rawRules) {
+    const rulesByFolderName = Object.create(null);
+    if (!Array.isArray(rawRules)) {
+        return [];
+    }
+
+    rawRules.forEach((rule) => {
+        const folderName = String((rule && rule.folderName) || '').trim();
+        const labelColor = fm_normalizeLabelColor(rule && rule.labelColor);
+        const folderKey = folderName.toLowerCase();
+
+        if (!folderName || /[\\/]/.test(folderName) || labelColor === null) {
+            return;
+        }
+
+        rulesByFolderName[folderKey] = { folderName: folderName, labelColor: labelColor };
+    });
+
+    return Object.keys(rulesByFolderName).map((folderKey) => rulesByFolderName[folderKey]);
+}
+
+// Read the configured source-folder rules and return the label of the deepest matching parent folder.
+function fm_getFolderLabelColorForFile(file) {
+    const rules = fm_normalizeFolderLabelRules(settings.folderLabelRules);
+    const rulesByFolderName = Object.create(null);
+    const folderPath = String((file && (file.sourceFolderPath || file.binPath)) || '').replace(/\\/g, '/');
+    const folderSegments = folderPath.split('/').filter(Boolean);
+
+    rules.forEach((rule) => {
+        rulesByFolderName[rule.folderName.toLowerCase()] = rule.labelColor;
+    });
+
+    for (let segmentIndex = folderSegments.length - 1; segmentIndex >= 0; segmentIndex--) {
+        const matchingLabel = rulesByFolderName[folderSegments[segmentIndex].toLowerCase()];
+        if (matchingLabel !== undefined) {
+            return matchingLabel;
+        }
+    }
+
+    return null;
+}
+
+// Add the resolved label to an import payload without modifying the scan result retained by the UI.
+function fm_prepareFilesForImport(files) {
+    return (files || []).map((file) => {
+        const preparedFile = Object.assign({}, file);
+        const labelColor = fm_getFolderLabelColorForFile(file);
+
+        if (labelColor === null) {
+            delete preparedFile.labelColor;
+        } else {
+            preparedFile.labelColor = labelColor;
+        }
+
+        return preparedFile;
+    });
+}
+
+// Replace fallback definitions with Premiere's active label preferences when they are available.
+function fm_applyPremiereLabelDefinitions(rawLabels) {
+    if (!Array.isArray(rawLabels) || rawLabels.length !== FM_DEFAULT_PREMIERE_LABELS.length) {
+        return false;
+    }
+
+    const labelsById = {};
+    rawLabels.forEach((label) => {
+        const labelId = fm_normalizeLabelColor(label && label.id);
+        if (labelId !== null) {
+            labelsById[labelId] = label;
+        }
+    });
+
+    FM_PREMIERE_LABELS = FM_DEFAULT_PREMIERE_LABELS.map((fallback, labelId) => {
+        const candidate = labelsById[labelId] || {};
+        const name = String(candidate.name || '').trim() || fallback.name;
+        const color = /^#[0-9a-f]{6}$/i.test(String(candidate.color || '')) ? candidate.color : fallback.color;
+        return { id: labelId, name: name, color: color };
+    });
+    return true;
+}
+
+// Ask the host for the current Premiere preference palette and redraw the editable rules afterwards.
+async function fm_refreshPremiereLabelDefinitions() {
+    const rawResult = await fm_evalScriptPromise(
+        `typeof FileManager_getPremiereLabelDefinitions === 'function' ? FileManager_getPremiereLabelDefinitions() : ''`
+    );
+
+    try {
+        const payload = JSON.parse(rawResult);
+        const didApply = !payload.error && fm_applyPremiereLabelDefinitions(payload.labels);
+        if (didApply) {
+            fm_renderFolderLabelRules();
+        }
+        return didApply;
+    } catch (error) {
+        console.warn('Unable to read Premiere label preferences:', error.message);
+        return false;
+    }
+}
+
+// Update one row's color dot to match its selected Premiere label.
+function fm_updateFolderLabelSwatch(selectElement, swatchElement) {
+    const label = FM_PREMIERE_LABELS[fm_normalizeLabelColor(selectElement.value) || 0];
+    swatchElement.style.backgroundColor = label.color;
+}
+
+// Render the source-folder-to-label rules as native controls because the palette has only 16 options.
+function fm_renderFolderLabelRules() {
+    const rulesContainer = document.getElementById('folderLabelRules');
+    if (!rulesContainer) {
+        return;
+    }
+
+    rulesContainer.innerHTML = '';
+
+    settings.folderLabelRules.forEach((rule, ruleIndex) => {
+        const row = document.createElement('div');
+        const folderInput = document.createElement('input');
+        const labelSelectWrap = document.createElement('div');
+        const swatch = document.createElement('span');
+        const labelSelect = document.createElement('select');
+        const removeButton = document.createElement('button');
+
+        row.className = 'folder-label-rule';
+        folderInput.type = 'text';
+        folderInput.className = 'folder-label-name';
+        folderInput.value = rule.folderName;
+        folderInput.placeholder = t('settings.folderLabelNamePlaceholder');
+        folderInput.setAttribute('aria-label', t('settings.folderLabelNamePlaceholder'));
+
+        labelSelectWrap.className = 'folder-label-select-wrap';
+        swatch.className = 'folder-label-swatch';
+        labelSelect.className = 'folder-label-color';
+        labelSelect.setAttribute('aria-label', t('settings.folderLabelRules'));
+        FM_PREMIERE_LABELS.forEach((label) => {
+            const option = document.createElement('option');
+            option.value = String(label.id);
+            option.textContent = label.name;
+            option.selected = label.id === rule.labelColor;
+            labelSelect.appendChild(option);
+        });
+        labelSelect.addEventListener('change', () => fm_updateFolderLabelSwatch(labelSelect, swatch));
+        fm_updateFolderLabelSwatch(labelSelect, swatch);
+
+        removeButton.type = 'button';
+        removeButton.className = 'remove-folder-label-rule-btn';
+        removeButton.textContent = '×';
+        removeButton.title = t('buttons.removeFolderLabelRule');
+        removeButton.setAttribute('aria-label', t('buttons.removeFolderLabelRule'));
+        removeButton.addEventListener('click', () => {
+            const currentRules = fm_readFolderLabelRulesFromUI();
+            currentRules.splice(ruleIndex, 1);
+            settings.folderLabelRules = currentRules;
+            fm_renderFolderLabelRules();
+        });
+
+        labelSelectWrap.appendChild(swatch);
+        labelSelectWrap.appendChild(labelSelect);
+        row.appendChild(folderInput);
+        row.appendChild(labelSelectWrap);
+        row.appendChild(removeButton);
+        rulesContainer.appendChild(row);
+    });
+}
+
+// Read the editable rule controls and discard empty, duplicate, or invalid values before saving.
+function fm_readFolderLabelRulesFromUI() {
+    const ruleRows = document.querySelectorAll('#folderLabelRules .folder-label-rule');
+    const rawRules = Array.from(ruleRows).map((row) => ({
+        folderName: row.querySelector('.folder-label-name').value,
+        labelColor: row.querySelector('.folder-label-color').value
+    }));
+    return fm_normalizeFolderLabelRules(rawRules);
+}
 
 function fm_normalizeHostLogLevel(level) {
     const normalized = (level || '').toString().toLowerCase();
@@ -1240,7 +1461,8 @@ function loadSettings() {
             ...loadedSettings, // Override with saved values
             bannedExtensions: mergedBannedExtensions,
             excludedFolderNames: loadedSettings.excludedFolderNames || settings.excludedFolderNames,
-            excludedFolders: loadedSettings.excludedFolders || settings.excludedFolders
+            excludedFolders: loadedSettings.excludedFolders || settings.excludedFolders,
+            folderLabelRules: fm_normalizeFolderLabelRules(loadedSettings.folderLabelRules)
         };
 
         // Load language if saved
@@ -1279,6 +1501,9 @@ function loadSettings() {
     document.getElementById('excludedFolders').value = (settings.excludedFolders || []).join('\n');
     document.getElementById('excludedFolderNames').value = (settings.excludedFolderNames || []).join('\n');
     document.getElementById('bannedExtensions').value = (settings.bannedExtensions || []).sort().join('\n');
+    // Render saved label rules immediately, then refresh names and colors from Premiere asynchronously.
+    fm_renderFolderLabelRules();
+    fm_refreshPremiereLabelDefinitions();
     document.getElementById('autoImport').checked = settings.autoImport || false;
     document.getElementById('autoImportInterval').value = settings.autoImportInterval || 30;
     document.getElementById('hostLogLevel').value = fm_normalizeHostLogLevel(settings.hostLogLevel);
@@ -1318,6 +1543,9 @@ function saveSettings() {
         .split('\n')
         .map(f => f.trim())
         .filter(f => f !== '');
+
+    // Persist only valid folder-name-to-label mappings from the settings editor.
+    settings.folderLabelRules = fm_readFolderLabelRulesFromUI();
 
     // Parse banned extensions
     const bannedExtensionsText = document.getElementById('bannedExtensions').value;
@@ -2297,6 +2525,8 @@ function displayReport(results) {
 // Open settings
 function openSettings() {
     document.getElementById('settingsPanel').classList.add('open');
+    // Refresh label names and swatches whenever settings are opened after Premiere preference edits.
+    fm_refreshPremiereLabelDefinitions();
 }
 
 // Close settings
@@ -2422,7 +2652,8 @@ async function fm_importFilesInBatches(filesToImport, options = {}) {
     const batchSize = options.batchSize || FM_IMPORT_BATCH_SIZE;
     const contextLabel = options.contextLabel || 'import';
     const enableSuggestedAutoBan = options.enableSuggestedAutoBan === true;
-    const batches = fm_chunkArray(filesToImport || [], batchSize);
+    // Resolve source-folder labels once per import so manual, compact, and auto-import share the same behavior.
+    const batches = fm_chunkArray(fm_prepareFilesForImport(filesToImport), batchSize);
     const allResults = [];
     const autoAddedExtensions = new Set();
 
@@ -2888,6 +3119,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('closeSettingsBtn').addEventListener('click', closeSettings);
     document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
     document.getElementById('browseRootBtn').addEventListener('click', browseRootFolder);
+    document.getElementById('addFolderLabelRuleBtn').addEventListener('click', () => {
+        // Preserve in-progress row edits before adding and focusing a fresh rule.
+        settings.folderLabelRules = fm_readFolderLabelRulesFromUI();
+        settings.folderLabelRules.push({ folderName: '', labelColor: 0 });
+        fm_renderFolderLabelRules();
+        const inputs = document.querySelectorAll('#folderLabelRules .folder-label-name');
+        if (inputs.length) {
+            inputs[inputs.length - 1].focus();
+        }
+    });
 
     document.getElementById('analyzeBtn').addEventListener('click', analyzeAll);
 

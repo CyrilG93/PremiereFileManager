@@ -20,7 +20,7 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 
 ### macOS
 
-1. Download the latest release from the [Releases](Releases/) folder
+1. Download the latest release Gumroad.
 2. Extract the ZIP file
 3. Open Terminal
 4. **Easiest method (recommended):** drag and drop `install_macos.sh` into the Terminal window, then press Enter
@@ -35,9 +35,9 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 
 ### Windows
 
-1. Download the latest release from the [Releases](Releases/) folder
+1. Download the latest release from Gumroad.
 2. Extract the ZIP file
-3. Run `install_windows.bat` (administrator rights are not required)
+3. Run `install_windows.bat` 
 4. Restart Adobe Premiere Pro
 5. Open the extension: **Window → Extensions → File Manager**
 

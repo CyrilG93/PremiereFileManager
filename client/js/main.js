@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.4.5';
+let CURRENT_VERSION = '1.5.0';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {

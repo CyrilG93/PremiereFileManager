@@ -122,12 +122,12 @@ For issues, questions, or feature requests, please send me a message on Discord.
 
 ## Changelog
 
-### v1.4.5 (Pré-release) - 2026-08-10
+### v1.5.0 - 2026-08-23
 - Ajout des labels Premiere automatiques selon le dossier source des médias.
 - L'auto-import se met maintenant en pause pendant une consolidation, puis reprend automatiquement.
 - Fiabilité améliorée pour les noms de fichiers particuliers et les grands dossiers de médias.
 
-### v1.4.0 (Latest) - 2026-07-06
+### v1.4.0 - 2026-07-06
 - Added SpellBook compact commands for external shortcuts and control surfaces.
 - Added a clickable version badge in the full-mode header that opens the File Manager product page.
 - Improved camera-card imports, Windows NAS path handling, and installer debug-mode coverage.

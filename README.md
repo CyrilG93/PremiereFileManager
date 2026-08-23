@@ -123,9 +123,9 @@ For issues, questions, or feature requests, please send me a message on Discord.
 ## Changelog
 
 ### v1.5.0 - 2026-08-23
-- Ajout des labels Premiere automatiques selon le dossier source des médias.
-- L'auto-import se met maintenant en pause pendant une consolidation, puis reprend automatiquement.
-- Fiabilité améliorée pour les noms de fichiers particuliers et les grands dossiers de médias.
+- Added automatic Premiere labels based on each media file's source folder.
+- Auto-import now pauses during consolidation and resumes automatically afterwards.
+- Improved reliability with special file names and large media folders.
 
 ### v1.4.0 - 2026-07-06
 - Added SpellBook compact commands for external shortcuts and control surfaces.

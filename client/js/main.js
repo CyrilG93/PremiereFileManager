@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.5';
+let CURRENT_VERSION = '1.5.6';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2364,14 +2364,32 @@ async function fm_analyzeStructureWithClientFallback() {
         throw new Error(project.error);
     }
 
-    const resolvedRoot = fm_path.resolve(projectRoot);
+    // Resolve aliases and macOS volume casing before comparing relative locations.
+    const fm_decodeFilePath = (value) => {
+        const rawValue = String(value || '');
+        const withoutFileUri = rawValue.replace(/^file:\/\/(localhost)?\/?/i, '/');
+        try {
+            return decodeURI(withoutFileUri);
+        } catch (error) {
+            return withoutFileUri;
+        }
+    };
+    const fm_resolveExistingPath = (value) => {
+        const resolvedPath = fm_path.resolve(fm_decodeFilePath(value));
+        try {
+            return fm_fs.realpathSync(resolvedPath);
+        } catch (error) {
+            return resolvedPath;
+        }
+    };
+    const resolvedRoot = fm_resolveExistingPath(projectRoot);
     const isWindows = fm_os.platform() === 'win32';
     const comparable = (value) => {
         const normalized = fm_path.resolve(String(value || '')).replace(/\\/g, '/');
         return isWindows ? normalized.toLowerCase() : normalized;
     };
     const items = (project.files || []).map((media) => {
-        const sourcePath = fm_path.resolve(String(media.path || ''));
+        const sourcePath = fm_resolveExistingPath(media.path);
         const sourceName = fm_path.basename(sourcePath);
         const diskFolder = fm_path.relative(resolvedRoot, fm_path.dirname(sourcePath)).replace(/\\/g, '/');
         const isExternal = diskFolder === '..' || diskFolder.indexOf('../') === 0 || fm_path.isAbsolute(diskFolder);
@@ -2381,7 +2399,7 @@ async function fm_analyzeStructureWithClientFallback() {
         const binPath = String(media.binPath || '').replace(/\\/g, '/');
         const targetPath = fm_path.join(resolvedRoot, ...binPath.split('/').filter(Boolean), sourceName);
         const sameDiskPath = comparable(sourcePath) === comparable(targetPath);
-        return {
+        const structureItem = {
             name: sourceName,
             nodeId: media.nodeId || '',
             currentPath: sourcePath,
@@ -2395,6 +2413,9 @@ async function fm_analyzeStructureWithClientFallback() {
             targetExists: !sameDiskPath && fm_fs.existsSync(targetPath),
             sourceExists: fm_fs.existsSync(sourcePath)
         };
+        // Keep per-file facts in the built-in debug console for real-project diagnosis.
+        debugLog(`[Structure] ${sourceName} | Premiere=${binPath || 'Racine'} | Disque=${diskFolder || 'Racine'} | P→D=${structureItem.diskSyncNeeded} | D→P=${structureItem.premiereSyncNeeded}`, 'info');
+        return structureItem;
     }).filter(Boolean);
 
     return { projectRoot: resolvedRoot, items: items, ignoredBannedCount: 0 };

@@ -177,6 +177,85 @@ main {
     gap: 16px;
 }
 
+/* Keep the two workflows distinct while retaining shared project information. */
+.panel-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+}
+
+.panel-tab {
+    background: transparent;
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    padding: 7px 12px;
+}
+
+.panel-tab:hover,
+.panel-tab.active {
+    background: var(--bg-tertiary);
+    border-color: var(--border);
+    color: var(--text-primary);
+}
+
+.panel-tab.active {
+    border-color: var(--accent-primary);
+}
+
+.structure-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.structure-section[hidden] {
+    display: none !important;
+}
+
+.structure-results[hidden] {
+    display: none !important;
+}
+
+/* Let the active tab hide legacy panels even when their own visibility rules use !important. */
+body[data-active-tab="structure"] [data-tab-panel="media"] {
+    display: none !important;
+}
+
+.structure-intro {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.structure-intro h2 {
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.structure-intro p,
+.structure-option {
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+.structure-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2px;
+}
+
+.structure-results .file-item.conflict {
+    border-color: var(--warning);
+}
+
+.structure-results .file-item .structure-direction {
+    color: var(--text-secondary);
+    font-size: 11px;
+}
+
 /* Project Info */
 .project-info {
     background: var(--bg-secondary);

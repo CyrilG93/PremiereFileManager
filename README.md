@@ -7,6 +7,7 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 - 📥 **Smart Import**: Automatically detect and import new files from your project folder
 - 🎥 **Camera Folder Support**: Detect major camera card structures and import only media clips (without recreating full technical folder trees)
 - 📦 **Consolidate**: Organize external files into your project structure (copy files that are outside your project folder)
+- 🗂️ **Structure Sync**: Compare Premiere bins with disk folders, then copy/relink media toward the disk structure or move media into matching Premiere bins
 - 🔄 **Auto-Import Toggle**: Quick toggle button in header with visual feedback
 - ⌨️ **SpellBook Support**: Trigger compact actions from SpellBook shortcuts or control surfaces
 - 🔗 **Auto-Relink**: Automatically relink media when files are moved
@@ -54,6 +55,16 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 ### Consolidate Files
 
 The extension will detect files that are used in your project but located outside your project folder. Click **Consolidate** to copy them into your project structure while maintaining the bin organization.
+
+### Synchronize Structure
+
+Open the **Structure** tab to compare each media item's Premiere bin with its parent folder on disk. Review the detected differences before choosing a direction:
+
+- **Premiere → disk** copies each selected file into the folder matching its bin, creates missing folders, then relinks the exact Premiere item. Existing destination files are shown as conflicts and are never overwritten.
+- **Disk → Premiere** moves each selected media item into a bin matching its current disk parent folder, creating missing bins when needed.
+- Keep **Consolidate external media** enabled to include media stored outside the project root when syncing from Premiere to disk.
+
+The original file is never deleted by structure synchronization.
 
 ### Auto-Import
 

@@ -664,7 +664,9 @@ function analyzeProjectItems(item, fileList, currentBinPath) {
                     name: item.name,
                     path: filePath,
                     binPath: binPath,
-                    type: item.type.toString()
+                    type: item.type.toString(),
+                    // Keep Premiere's stable item id so a structure operation updates the exact project item.
+                    nodeId: item.nodeId || ''
                 });
             }
         } catch (e) {
@@ -2329,5 +2331,175 @@ function FileManager_importFilesToProjectBase64(base64Json) {
         return FileManager_importFilesToProject(filesJson);
     } catch (e) {
         return JSON.stringify({ error: 'Base64 decode error: ' + e.toString() });
+    }
+}
+
+// Return a slash-separated folder path relative to the configured project root.
+function FileManager_getRelativeFolderPath(mediaPath, projectRoot) {
+    var normalizedMedia = normalizeComparablePath(mediaPath);
+    var normalizedRoot = normalizeComparablePath(projectRoot);
+    var originalMedia = String(mediaPath || '').replace(/\\/g, '/');
+    var originalRoot = String(projectRoot || '').replace(/\\/g, '/');
+    var relativePath = '';
+
+    // Match the canonical comparison helper by removing a user-entered trailing separator.
+    while (originalRoot.length > 1 && originalRoot.charAt(originalRoot.length - 1) === '/') {
+        originalRoot = originalRoot.substring(0, originalRoot.length - 1);
+    }
+
+    if (!normalizedMedia || !normalizedRoot) {
+        return null;
+    }
+    if (normalizedMedia === normalizedRoot) {
+        return '';
+    }
+    if (normalizedMedia.indexOf(normalizedRoot + '/') !== 0) {
+        return null;
+    }
+
+    // Use the original string for the returned path so newly-created bins retain the user's folder capitalization.
+    relativePath = originalMedia.substring(originalRoot.length + 1);
+    var slashIndex = relativePath.lastIndexOf('/');
+    return slashIndex >= 0 ? relativePath.substring(0, slashIndex) : '';
+}
+
+// Compare project-item bins with the on-disk parent folders without changing either side.
+function FileManager_analyzeStructure(rootPath, levels) {
+    try {
+        var analysis = JSON.parse(analyzeProject());
+        var levelsToUse = (levels !== undefined && levels !== null) ? levels : 0;
+        var projectRoot = rootPath || FileManager_getProjectRootPath(levelsToUse);
+        var items = [];
+
+        if (analysis.error) {
+            return JSON.stringify(analysis);
+        }
+        if (!projectRoot) {
+            return JSON.stringify({ error: 'Cannot determine project root path' });
+        }
+
+        for (var i = 0; i < analysis.files.length; i++) {
+            var media = analysis.files[i];
+            var binPath = String(media.binPath || '').replace(/\\/g, '/');
+            var mediaFile = FileManager_createFileFromNativePath(media.path);
+            var parentFolder = mediaFile && mediaFile.parent ? mediaFile.parent.fsName : '';
+            var diskFolderPath = FileManager_getRelativeFolderPath(media.path, projectRoot);
+            var isExternal = diskFolderPath === null;
+            var targetFolder = projectRoot + (binPath ? '/' + binPath : '');
+            var targetPath = targetFolder + '/' + media.name;
+            var targetFile = FileManager_createFileFromNativePath(targetPath);
+            var sameDiskPath = normalizeComparablePath(media.path) === normalizeComparablePath(targetPath);
+            var normalizedBin = binPath.toLowerCase();
+            var normalizedDiskFolder = String(diskFolderPath || '').toLowerCase();
+
+            items.push({
+                name: media.name,
+                nodeId: media.nodeId || '',
+                currentPath: media.path,
+                binPath: binPath,
+                diskFolderPath: diskFolderPath,
+                external: isExternal,
+                targetPath: targetPath,
+                targetBinPath: diskFolderPath === null ? '' : diskFolderPath,
+                diskSyncNeeded: !sameDiskPath,
+                premiereSyncNeeded: !isExternal && normalizedBin !== normalizedDiskFolder,
+                targetExists: !sameDiskPath && targetFile && targetFile.exists,
+                sourceExists: mediaFile && mediaFile.exists,
+                parentFolder: parentFolder
+            });
+        }
+
+        return JSON.stringify({ projectRoot: projectRoot, items: items });
+    } catch (e) {
+        return JSON.stringify({ error: e.toString() });
+    }
+}
+
+// Find one media item by node id first, with path and bin fallbacks for older Premiere hosts.
+function FileManager_findStructureItem(parentItem, nodeId, currentPath, currentBinPath) {
+    if (!parentItem || !parentItem.children) {
+        return null;
+    }
+
+    var wantedPath = normalizeComparablePath(currentPath);
+    var wantedBin = String(currentBinPath || '').toLowerCase();
+    for (var i = 0; i < parentItem.children.numItems; i++) {
+        var child = parentItem.children[i];
+        var childPath = '';
+        var childNodeId = '';
+        if (!child) {
+            continue;
+        }
+        try { childNodeId = String(child.nodeId || ''); } catch (nodeError) { childNodeId = ''; }
+        try { childPath = child.getMediaPath ? child.getMediaPath() : ''; } catch (pathError) { childPath = ''; }
+
+        if ((nodeId && childNodeId === String(nodeId)) ||
+            (wantedPath && normalizeComparablePath(childPath) === wantedPath && String(getBinPath(child) || '').toLowerCase() === wantedBin)) {
+            return child;
+        }
+
+        var nested = FileManager_findStructureItem(child, nodeId, currentPath, currentBinPath);
+        if (nested) {
+            return nested;
+        }
+    }
+    return null;
+}
+
+// Move selected project items into bins that mirror their current on-disk folders.
+function FileManager_moveItemsToDiskFolders(itemsJson) {
+    try {
+        var items = JSON.parse(itemsJson);
+        var results = [];
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var projectItem = FileManager_findStructureItem(app.project.rootItem, item.nodeId, item.currentPath, item.binPath);
+            if (!projectItem) {
+                results.push({ name: item.name, success: false, error: 'Project item not found' });
+                continue;
+            }
+            try {
+                // Premiere creates missing bins through the existing safe bin resolver.
+                var moveResult = projectItem.moveBin(getOrCreateBin(item.targetBinPath || ''));
+                if (moveResult !== 0) {
+                    throw new Error('Premiere rejected the bin move');
+                }
+                results.push({ name: item.name, success: true });
+            } catch (moveError) {
+                results.push({ name: item.name, success: false, error: moveError.toString() });
+            }
+        }
+        return JSON.stringify({ results: results });
+    } catch (e) {
+        return JSON.stringify({ error: e.toString() });
+    }
+}
+
+// Relink copied structure-sync media by their project-item ids to avoid changing duplicate clips.
+function FileManager_relinkStructureItems(itemsJson) {
+    try {
+        var items = JSON.parse(itemsJson);
+        var results = [];
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var projectItem = FileManager_findStructureItem(app.project.rootItem, item.nodeId, item.currentPath, item.binPath);
+            var relinkPath = IS_WINDOWS ? String(item.targetPath).replace(/\//g, '\\') : item.targetPath;
+            if (!projectItem) {
+                results.push({ name: item.name, success: false, error: 'Project item not found' });
+                continue;
+            }
+            try {
+                var relinkResult = projectItem.changeMediaPath(relinkPath, true);
+                if (relinkResult !== 0) {
+                    throw new Error('Premiere rejected the media relink');
+                }
+                results.push({ name: item.name, success: true });
+            } catch (relinkError) {
+                results.push({ name: item.name, success: false, error: relinkError.toString() });
+            }
+        }
+        return JSON.stringify({ results: results });
+    } catch (e) {
+        return JSON.stringify({ error: e.toString() });
     }
 }

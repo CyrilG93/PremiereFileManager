@@ -65,6 +65,11 @@
         <div id="updateBanner"></div>
 
         <main>
+            <!-- Tabs keep media import/consolidation separate from structure synchronization. -->
+            <div class="panel-tabs" role="tablist" aria-label="File Manager sections">
+                <button class="panel-tab active" id="mediaTabBtn" type="button" role="tab" aria-selected="true">Médias</button>
+                <button class="panel-tab" id="structureTabBtn" type="button" role="tab" aria-selected="false">Structure</button>
+            </div>
             <div class="project-info" id="projectInfo">
                 <div class="info-item">
                     <span class="info-label" data-i18n="labels.project">Projet:</span>
@@ -77,7 +82,7 @@
             </div>
 
             <!-- Action Buttons -->
-            <div class="action-section">
+            <div class="action-section" data-tab-panel="media">
                 <button class="analyze-btn" id="analyzeBtn">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"
@@ -120,7 +125,7 @@
             </div>
 
             <!-- Consolidation Progress Section -->
-            <div id="consolidationProgress" class="section hidden" style="margin-top: 16px;">
+            <div id="consolidationProgress" class="section hidden" data-tab-panel="media" style="margin-top: 16px;">
                 <div class="consolidation-progress-container">
                     <div class="consolidation-header">
                         <span class="consolidation-title">📦 Consolidation en cours...</span>
@@ -140,7 +145,7 @@
             </div>
 
             <!-- Dual Results Section -->
-            <div id="resultsSection" class="section">
+            <div id="resultsSection" class="section" data-tab-panel="media">
                 <div class="dual-results">
                     <!-- Import Column (Left) -->
                     <div class="result-column import-column">
@@ -190,7 +195,7 @@
                 </div>
             </div>
 
-            <div class="sync-controls" id="syncControls">
+            <div class="sync-controls" id="syncControls" data-tab-panel="media">
                 <button class="sync-btn" id="syncBtn">
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"
@@ -200,7 +205,7 @@
                 </button>
             </div>
 
-            <div class="progress-container" id="progressContainer">
+            <div class="progress-container" id="progressContainer" data-tab-panel="media">
                 <div class="progress-info">
                     <span id="progressText">Synchronisation en cours...</span>
                     <span id="progressPercent">0%</span>
@@ -212,6 +217,37 @@
 
 
             <div class="status-message" id="statusMessage"></div>
+
+            <!-- Structure synchronization uses copies and relinking so source media remains untouched. -->
+            <section class="structure-section" id="structureSection" data-tab-panel="structure" hidden>
+                <div class="structure-intro">
+                    <h2>Synchronisation de structure</h2>
+                    <p>Compare les chutiers Premiere avec les dossiers du projet. Les fichiers sont copiés puis reliés : aucun original n’est supprimé.</p>
+                </div>
+                <label class="structure-option">
+                    <input type="checkbox" id="structureIncludeExternal" checked />
+                    <span>Consolider aussi les médias en dehors du dossier racine</span>
+                </label>
+                <button class="analyze-btn" id="analyzeStructureBtn" type="button">Analyser la structure</button>
+                <div class="dual-results structure-results" id="structureResults" hidden>
+                    <div class="result-column export-column">
+                        <div class="column-header">
+                            <h3>Premiere → disque</h3>
+                            <p class="column-subtitle">Copie dans le dossier correspondant au chutier, puis relie le média.</p>
+                        </div>
+                        <div class="files-list" id="structureDiskList"></div>
+                        <button class="action-btn export-action-btn" id="syncToDiskBtn" type="button">Synchroniser vers le disque (<span id="structureDiskCount">0</span>)</button>
+                    </div>
+                    <div class="result-column import-column">
+                        <div class="column-header">
+                            <h3>Disque → Premiere</h3>
+                            <p class="column-subtitle">Déplace le média dans le chutier correspondant à son dossier.</p>
+                        </div>
+                        <div class="files-list" id="structurePremiereList"></div>
+                        <button class="action-btn import-action-btn" id="syncToPremiereBtn" type="button">Synchroniser vers Premiere (<span id="structurePremiereCount">0</span>)</button>
+                    </div>
+                </div>
+            </section>
         </main>
 
         <!-- Settings Panel -->

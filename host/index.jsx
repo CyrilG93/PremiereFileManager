@@ -2364,12 +2364,14 @@ function FileManager_getRelativeFolderPath(mediaPath, projectRoot) {
 }
 
 // Compare project-item bins with the on-disk parent folders without changing either side.
-function FileManager_analyzeStructure(rootPath, levels) {
+function FileManager_analyzeStructure(rootPath, levels, bannedExtensionsJson) {
     try {
         var analysis = JSON.parse(analyzeProject());
         var levelsToUse = (levels !== undefined && levels !== null) ? levels : 0;
         var projectRoot = rootPath || FileManager_getProjectRootPath(levelsToUse);
         var items = [];
+        var bannedExtensionsLookup = {};
+        var ignoredBannedCount = 0;
 
         if (analysis.error) {
             return JSON.stringify(analysis);
@@ -2378,38 +2380,63 @@ function FileManager_analyzeStructure(rootPath, levels) {
             return JSON.stringify({ error: 'Cannot determine project root path' });
         }
 
+        // Mirror the import ban list so non-media/support files never appear in structure operations.
+        try {
+            var bannedExtensions = bannedExtensionsJson ? JSON.parse(bannedExtensionsJson) : [];
+            for (var be = 0; be < bannedExtensions.length; be++) {
+                var bannedExtension = String(bannedExtensions[be] || '').toLowerCase();
+                if (bannedExtension !== '' && bannedExtension.charAt(0) !== '.') {
+                    bannedExtension = '.' + bannedExtension;
+                }
+                if (bannedExtension !== '' && bannedExtension !== '.') {
+                    bannedExtensionsLookup[bannedExtension] = true;
+                }
+            }
+        } catch (bannedExtensionsError) {
+            logPlatform('Structure analysis could not read banned extensions: ' + bannedExtensionsError.toString(), 'warn');
+        }
+
         for (var i = 0; i < analysis.files.length; i++) {
             var media = analysis.files[i];
             var binPath = String(media.binPath || '').replace(/\\/g, '/');
             var mediaFile = FileManager_createFileFromNativePath(media.path);
-            var parentFolder = mediaFile && mediaFile.parent ? mediaFile.parent.fsName : '';
-            var diskFolderPath = FileManager_getRelativeFolderPath(media.path, projectRoot);
+            // Use the real source filename: a Premiere clip can be renamed without renaming its disk file.
+            var sourcePath = mediaFile ? mediaFile.fsName : media.path;
+            var sourceFileName = mediaFile && mediaFile.name ? decodeURIPath(mediaFile.name) : String(media.path || '').replace(/.*[\\/]/, '');
+            var extension = getFileExtension(sourceFileName);
+            if (bannedExtensionsLookup[extension] === true) {
+                ignoredBannedCount++;
+                continue;
+            }
+            var diskFolderPath = FileManager_getRelativeFolderPath(sourcePath, projectRoot);
             var isExternal = diskFolderPath === null;
             var targetFolder = projectRoot + (binPath ? '/' + binPath : '');
-            var targetPath = targetFolder + '/' + media.name;
+            var targetPath = targetFolder + '/' + sourceFileName;
             var targetFile = FileManager_createFileFromNativePath(targetPath);
-            var sameDiskPath = normalizeComparablePath(media.path) === normalizeComparablePath(targetPath);
+            var canonicalTargetPath = targetFile ? targetFile.fsName : targetPath;
+            var sameDiskPath = normalizeComparablePath(sourcePath) === normalizeComparablePath(canonicalTargetPath);
             var normalizedBin = binPath.toLowerCase();
             var normalizedDiskFolder = String(diskFolderPath || '').toLowerCase();
 
+            logPlatform('STRUCTURE: ' + sourceFileName + ' bin=' + binPath + ' disk=' + (diskFolderPath === null ? 'EXTERNAL' : diskFolderPath) + ' sameDisk=' + sameDiskPath, 'debug');
+
             items.push({
-                name: media.name,
+                name: sourceFileName,
                 nodeId: media.nodeId || '',
-                currentPath: media.path,
+                currentPath: sourcePath,
                 binPath: binPath,
                 diskFolderPath: diskFolderPath,
                 external: isExternal,
-                targetPath: targetPath,
+                targetPath: canonicalTargetPath,
                 targetBinPath: diskFolderPath === null ? '' : diskFolderPath,
                 diskSyncNeeded: !sameDiskPath,
                 premiereSyncNeeded: !isExternal && normalizedBin !== normalizedDiskFolder,
                 targetExists: !sameDiskPath && targetFile && targetFile.exists,
-                sourceExists: mediaFile && mediaFile.exists,
-                parentFolder: parentFolder
+                sourceExists: mediaFile && mediaFile.exists
             });
         }
 
-        return JSON.stringify({ projectRoot: projectRoot, items: items });
+        return JSON.stringify({ projectRoot: projectRoot, items: items, ignoredBannedCount: ignoredBannedCount });
     } catch (e) {
         return JSON.stringify({ error: e.toString() });
     }

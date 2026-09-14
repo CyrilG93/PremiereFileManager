@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.2';
+let CURRENT_VERSION = '1.5.3';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -1795,8 +1795,9 @@ function getProjectInfo() {
             }
 
             console.log('Project root:', info.projectRoot);
-            document.getElementById('projectName').textContent = info.projectName || '-';
-            document.getElementById('projectRoot').textContent = info.projectRoot || '-';
+            // Accept the host's canonical field names as well as legacy names used by older builds.
+            document.getElementById('projectName').textContent = info.projectName || info.name || '-';
+            document.getElementById('projectRoot').textContent = info.projectRoot || info.rootPath || '-';
         } catch (e) {
             console.error('getProjectInfo parse error:', e);
             showStatus('Erreur lors de la récupération des informations du projet', 'error');
@@ -2356,14 +2357,19 @@ async function fm_analyzeStructure() {
     analyzeButton.disabled = true;
     analyzeButton.textContent = 'Analyse en cours…';
     try {
-        const rawResult = await fm_evalScriptPromise(fm_buildHostCall('FileManager_analyzeStructure', [settings.rootFolder || '', settings.rootFolderLevels || 0]));
+        const rawResult = await fm_evalScriptPromise(fm_buildHostCall('FileManager_analyzeStructure', [
+            settings.rootFolder || '',
+            settings.rootFolderLevels || 0,
+            JSON.stringify(settings.bannedExtensions || [])
+        ]));
         const result = JSON.parse(rawResult);
         if (result.error) {
             throw new Error(result.error);
         }
         fm_structureItems = Array.isArray(result.items) ? result.items : [];
         fm_renderStructureResults();
-        showStatus(`${fm_structureItems.length} média(s) vérifié(s)`, 'success');
+        const ignoredBannedCount = Number(result.ignoredBannedCount || 0);
+        showStatus(`${fm_structureItems.length} média(s) vérifié(s)${ignoredBannedCount ? ` · ${ignoredBannedCount} extension(s) bannie(s) ignorée(s)` : ''}`, 'success');
     } catch (error) {
         console.error('Structure analysis error:', error);
         showStatus(`Erreur d'analyse de structure : ${error.message}`, 'error');

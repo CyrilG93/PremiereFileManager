@@ -63,6 +63,7 @@ Open the **Structure** tab to compare each media item's Premiere bin with its pa
 - **Premiere → disk** copies each selected file into the folder matching its bin, creates missing folders, then relinks the exact Premiere item. Existing destination files are shown as conflicts and are never overwritten.
 - **Disk → Premiere** moves each selected media item into a bin matching its current disk parent folder, creating missing bins when needed.
 - Keep **Consolidate external media** enabled to include media stored outside the project root when syncing from Premiere to disk.
+- File extensions listed as banned in Settings are ignored by both import and structure synchronization.
 
 The original file is never deleted by structure synchronization.
 
@@ -93,7 +94,7 @@ The **Import** and **Consolidate** commands use the same one-click behavior as c
 - **Auto-Relink**: Automatically relink media after consolidation
 - **Excluded Folders**: Folders to ignore during consolidation
 - **Excluded Folder Names**: Folder names to exclude (e.g., "Backup", "Archive")
-- **Banned Extensions**: File types to never import
+- **Banned Extensions**: File types to ignore during import and structure synchronization
 - **Premiere Labels by Source Folder**: Assign a Premiere label to media coming from a folder name; when nested folders match, the closest folder to the file takes priority
 - **Auto-Import**: Enable automatic scanning
 - **Auto-Import Interval**: How often to scan (in seconds)

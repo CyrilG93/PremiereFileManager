@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.6';
+let CURRENT_VERSION = '1.5.7';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2457,7 +2457,31 @@ function fm_isStructureExtensionBanned(item) {
     });
 }
 
-// Copy selected files into their Premiere-bin paths, then relink only successfully copied media.
+// Remove an original only after its destination has been copied and relinked successfully.
+function fm_removeMovedStructureSources(items) {
+    return (items || []).map((item) => {
+        try {
+            const sourcePath = fm_path.resolve(item.currentPath);
+            const destinationPath = fm_path.resolve(item.targetPath);
+            if (sourcePath === destinationPath) {
+                throw new Error('Source and destination are identical');
+            }
+            const sourceStats = fm_fs.statSync(sourcePath);
+            const destinationStats = fm_fs.statSync(destinationPath);
+            if (!sourceStats.isFile() || !destinationStats.isFile() || sourceStats.size !== destinationStats.size) {
+                throw new Error('Destination verification failed');
+            }
+            fm_fs.unlinkSync(sourcePath);
+            debugLog(`[Structure] Source removed after relink: ${sourcePath}`, 'info');
+            return { name: item.name, success: true };
+        } catch (error) {
+            debugLog(`[Structure] Source retained: ${item.currentPath} (${error.message})`, 'warning');
+            return { name: item.name, success: false, error: error.message };
+        }
+    });
+}
+
+// Move selected files into their Premiere-bin paths by copying, relinking, then safely removing originals.
 async function fm_syncStructureToDisk() {
     const selectedItems = fm_getSelectedStructureItems('disk');
     const actionButton = document.getElementById('syncToDiskBtn');
@@ -2467,6 +2491,8 @@ async function fm_syncStructureToDisk() {
     actionButton.disabled = true;
     fm_beginConsolidation();
     showConsolidationProgress(selectedItems.length);
+    let movedCount = 0;
+    let retainedCount = 0;
     try {
         const copyResults = await copyFiles(selectedItems.map((item) => ({
             name: item.name,
@@ -2485,9 +2511,17 @@ async function fm_syncStructureToDisk() {
             if (relinkResult.error) {
                 throw new Error(relinkResult.error);
             }
+            const relinkEntries = Array.isArray(relinkResult.results) ? relinkResult.results : [];
+            const relinkedItems = copiedItems.filter((item, index) => relinkEntries[index] && relinkEntries[index].success === true);
+            updateConsolidationProgressText('Déplacement des fichiers…');
+            const removalResults = fm_removeMovedStructureSources(relinkedItems);
+            movedCount = removalResults.filter((entry) => entry.success).length;
+            retainedCount = copiedItems.length - movedCount;
         }
         const failedCount = copyResults.filter((result) => !result.success).length;
-        showStatus(failedCount ? `Synchronisation terminée avec ${failedCount} erreur(s)` : 'Structure synchronisée vers le disque', failedCount ? 'warning' : 'success');
+        const warningCount = failedCount + retainedCount;
+        const message = `${movedCount} fichier(s) déplacé(s) vers le disque${retainedCount ? ` · ${retainedCount} original(aux) conservé(s)` : ''}`;
+        showStatus(warningCount ? `${message} · ${warningCount} problème(s)` : message, warningCount ? 'warning' : 'success');
         await fm_analyzeStructure();
     } catch (error) {
         console.error('Structure disk sync error:', error);

@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.3';
+let CURRENT_VERSION = '1.5.4';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2269,15 +2269,15 @@ function fm_setActivePanelTab(tabName) {
 }
 
 // Render one safe, selectable discrepancy row with both Premiere and disk locations side by side.
-function fm_createStructureRow(item, index, includeExternal) {
+function fm_createStructureRow(item, index) {
     const row = document.createElement('div');
     const checkbox = document.createElement('input');
     const mode = document.createElement('span');
     const name = document.createElement('span');
     const premiere = document.createElement('span');
     const disk = document.createElement('span');
-    const canSyncToDisk = item.diskSyncNeeded && item.sourceExists && !item.targetExists && (includeExternal || !item.external);
-    const canSyncToPremiere = item.premiereSyncNeeded && !item.external;
+    const canSyncToDisk = item.diskSyncNeeded && item.sourceExists && !item.targetExists;
+    const canSyncToPremiere = item.premiereSyncNeeded;
 
     row.className = 'structure-row' + (item.targetExists ? ' conflict' : '');
     checkbox.type = 'checkbox';
@@ -2310,17 +2310,14 @@ function fm_createStructureRow(item, index, includeExternal) {
 
 // Rebuild one concise discrepancy list after an analysis or after the external-media option changes.
 function fm_renderStructureResults() {
-    const includeExternal = document.getElementById('structureIncludeExternal').checked;
     const structureList = document.getElementById('structureList');
-    const visibleItems = fm_structureItems.filter((item) =>
-        item.premiereSyncNeeded || (item.diskSyncNeeded && (includeExternal || !item.external))
-    );
+    const visibleItems = fm_structureItems.filter((item) => item.premiereSyncNeeded || item.diskSyncNeeded);
 
     structureList.innerHTML = '';
     if (visibleItems.length === 0) {
         structureList.innerHTML = '<div class="empty-state"><p>Aucune différence de structure détectée.</p></div>';
     } else {
-        visibleItems.forEach((item) => structureList.appendChild(fm_createStructureRow(item, fm_structureItems.indexOf(item), includeExternal)));
+        visibleItems.forEach((item) => structureList.appendChild(fm_createStructureRow(item, fm_structureItems.indexOf(item))));
     }
 
     document.getElementById('structureResults').hidden = false;
@@ -2329,12 +2326,11 @@ function fm_renderStructureResults() {
 
 // Update both action labels from the same selected rows and their valid direction.
 function fm_updateStructureCounts() {
-    const includeExternal = document.getElementById('structureIncludeExternal').checked;
     const selectedItems = Array.from(document.querySelectorAll('#structureList input:checked'))
         .map((checkbox) => fm_structureItems[Number(checkbox.dataset.index)])
         .filter(Boolean);
-    const diskCount = selectedItems.filter((item) => item.diskSyncNeeded && item.sourceExists && !item.targetExists && (includeExternal || !item.external)).length;
-    const premiereCount = selectedItems.filter((item) => item.premiereSyncNeeded && !item.external).length;
+    const diskCount = selectedItems.filter((item) => item.diskSyncNeeded && item.sourceExists && !item.targetExists).length;
+    const premiereCount = selectedItems.filter((item) => item.premiereSyncNeeded).length;
     document.getElementById('structureDiskCount').textContent = String(diskCount);
     document.getElementById('structurePremiereCount').textContent = String(premiereCount);
     document.getElementById('syncToDiskBtn').disabled = diskCount === 0;
@@ -2343,12 +2339,65 @@ function fm_updateStructureCounts() {
 
 // Get selected reviewed rows, avoiding a fresh scan between review and action.
 function fm_getSelectedStructureItems(direction) {
-    const includeExternal = document.getElementById('structureIncludeExternal').checked;
     return Array.from(document.querySelectorAll('#structureList input:checked'))
         .map((checkbox) => fm_structureItems[Number(checkbox.dataset.index)])
         .filter((item) => item && (direction === 'disk'
-            ? item.diskSyncNeeded && item.sourceExists && !item.targetExists && (includeExternal || !item.external)
-            : item.premiereSyncNeeded && !item.external));
+            ? item.diskSyncNeeded && item.sourceExists && !item.targetExists
+            : item.premiereSyncNeeded));
+}
+
+// Fall back to the long-standing project scanner if Premiere has not yet reloaded the updated host script.
+async function fm_analyzeStructureWithClientFallback() {
+    const rawInfo = await fm_evalScriptPromise(fm_buildHostCall('FileManager_getProjectInfo', [settings.rootFolderLevels || 0]));
+    const projectInfo = JSON.parse(rawInfo);
+    if (projectInfo.error) {
+        throw new Error(projectInfo.error);
+    }
+    const projectRoot = settings.rootFolder || projectInfo.rootPath || projectInfo.projectRoot;
+    if (!projectRoot) {
+        throw new Error('Impossible de déterminer le dossier racine du projet.');
+    }
+
+    const rawProject = await fm_evalScriptPromise('analyzeProject()');
+    const project = JSON.parse(rawProject);
+    if (project.error) {
+        throw new Error(project.error);
+    }
+
+    const resolvedRoot = fm_path.resolve(projectRoot);
+    const isWindows = fm_os.platform() === 'win32';
+    const comparable = (value) => {
+        const normalized = fm_path.resolve(String(value || '')).replace(/\\/g, '/');
+        return isWindows ? normalized.toLowerCase() : normalized;
+    };
+    const items = (project.files || []).map((media) => {
+        const sourcePath = fm_path.resolve(String(media.path || ''));
+        const sourceName = fm_path.basename(sourcePath);
+        const diskFolder = fm_path.relative(resolvedRoot, fm_path.dirname(sourcePath)).replace(/\\/g, '/');
+        const isExternal = diskFolder === '..' || diskFolder.indexOf('../') === 0 || fm_path.isAbsolute(diskFolder);
+        if (isExternal) {
+            return null;
+        }
+        const binPath = String(media.binPath || '').replace(/\\/g, '/');
+        const targetPath = fm_path.join(resolvedRoot, ...binPath.split('/').filter(Boolean), sourceName);
+        const sameDiskPath = comparable(sourcePath) === comparable(targetPath);
+        return {
+            name: sourceName,
+            nodeId: media.nodeId || '',
+            currentPath: sourcePath,
+            binPath: binPath,
+            diskFolderPath: diskFolder,
+            external: false,
+            targetPath: targetPath,
+            targetBinPath: diskFolder,
+            diskSyncNeeded: !sameDiskPath,
+            premiereSyncNeeded: binPath.toLowerCase() !== diskFolder.toLowerCase(),
+            targetExists: !sameDiskPath && fm_fs.existsSync(targetPath),
+            sourceExists: fm_fs.existsSync(sourcePath)
+        };
+    }).filter(Boolean);
+
+    return { projectRoot: resolvedRoot, items: items, ignoredBannedCount: 0 };
 }
 
 // Ask Premiere for its bin/media topology and calculate discrepancies in the host script.
@@ -2357,18 +2406,17 @@ async function fm_analyzeStructure() {
     analyzeButton.disabled = true;
     analyzeButton.textContent = 'Analyse en cours…';
     try {
-        const rawResult = await fm_evalScriptPromise(fm_buildHostCall('FileManager_analyzeStructure', [
-            settings.rootFolder || '',
-            settings.rootFolderLevels || 0,
-            JSON.stringify(settings.bannedExtensions || [])
-        ]));
-        const result = JSON.parse(rawResult);
+        const rawResult = await fm_evalScriptPromise(fm_buildHostCall('FileManager_analyzeStructure', [settings.rootFolder || '', settings.rootFolderLevels || 0]));
+        const result = rawResult === 'EvalScript error.'
+            ? await fm_analyzeStructureWithClientFallback()
+            : JSON.parse(rawResult);
         if (result.error) {
             throw new Error(result.error);
         }
-        fm_structureItems = Array.isArray(result.items) ? result.items : [];
+        const analyzedItems = Array.isArray(result.items) ? result.items : [];
+        fm_structureItems = analyzedItems.filter((item) => !fm_isStructureExtensionBanned(item));
         fm_renderStructureResults();
-        const ignoredBannedCount = Number(result.ignoredBannedCount || 0);
+        const ignoredBannedCount = analyzedItems.length - fm_structureItems.length;
         showStatus(`${fm_structureItems.length} média(s) vérifié(s)${ignoredBannedCount ? ` · ${ignoredBannedCount} extension(s) bannie(s) ignorée(s)` : ''}`, 'success');
     } catch (error) {
         console.error('Structure analysis error:', error);
@@ -2377,6 +2425,17 @@ async function fm_analyzeStructure() {
         analyzeButton.disabled = false;
         analyzeButton.textContent = 'Analyser la structure';
     }
+}
+
+// Reuse the configured extension ban list before structure results reach the UI.
+function fm_isStructureExtensionBanned(item) {
+    const filePath = String((item && (item.currentPath || item.name)) || '').toLowerCase();
+    const extensionMatch = filePath.match(/(\.[^./\\]+)$/);
+    const extension = extensionMatch ? extensionMatch[1] : '';
+    return (settings.bannedExtensions || []).some((value) => {
+        const normalized = String(value || '').trim().toLowerCase();
+        return normalized && (normalized.charAt(0) === '.' ? normalized : `.${normalized}`) === extension;
+    });
 }
 
 // Copy selected files into their Premiere-bin paths, then relink only successfully copied media.
@@ -3489,7 +3548,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('mediaTabBtn').addEventListener('click', () => fm_setActivePanelTab('media'));
     document.getElementById('structureTabBtn').addEventListener('click', () => fm_setActivePanelTab('structure'));
     document.getElementById('analyzeStructureBtn').addEventListener('click', fm_analyzeStructure);
-    document.getElementById('structureIncludeExternal').addEventListener('change', fm_renderStructureResults);
     document.getElementById('syncToDiskBtn').addEventListener('click', fm_syncStructureToDisk);
     document.getElementById('syncToPremiereBtn').addEventListener('click', fm_syncStructureToPremiere);
 

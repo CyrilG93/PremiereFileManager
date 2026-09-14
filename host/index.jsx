@@ -2364,36 +2364,18 @@ function FileManager_getRelativeFolderPath(mediaPath, projectRoot) {
 }
 
 // Compare project-item bins with the on-disk parent folders without changing either side.
-function FileManager_analyzeStructure(rootPath, levels, bannedExtensionsJson) {
+function FileManager_analyzeStructure(rootPath, levels) {
     try {
         var analysis = JSON.parse(analyzeProject());
         var levelsToUse = (levels !== undefined && levels !== null) ? levels : 0;
         var projectRoot = rootPath || FileManager_getProjectRootPath(levelsToUse);
         var items = [];
-        var bannedExtensionsLookup = {};
-        var ignoredBannedCount = 0;
 
         if (analysis.error) {
             return JSON.stringify(analysis);
         }
         if (!projectRoot) {
             return JSON.stringify({ error: 'Cannot determine project root path' });
-        }
-
-        // Mirror the import ban list so non-media/support files never appear in structure operations.
-        try {
-            var bannedExtensions = bannedExtensionsJson ? JSON.parse(bannedExtensionsJson) : [];
-            for (var be = 0; be < bannedExtensions.length; be++) {
-                var bannedExtension = String(bannedExtensions[be] || '').toLowerCase();
-                if (bannedExtension !== '' && bannedExtension.charAt(0) !== '.') {
-                    bannedExtension = '.' + bannedExtension;
-                }
-                if (bannedExtension !== '' && bannedExtension !== '.') {
-                    bannedExtensionsLookup[bannedExtension] = true;
-                }
-            }
-        } catch (bannedExtensionsError) {
-            logPlatform('Structure analysis could not read banned extensions: ' + bannedExtensionsError.toString(), 'warn');
         }
 
         for (var i = 0; i < analysis.files.length; i++) {
@@ -2403,13 +2385,12 @@ function FileManager_analyzeStructure(rootPath, levels, bannedExtensionsJson) {
             // Use the real source filename: a Premiere clip can be renamed without renaming its disk file.
             var sourcePath = mediaFile ? mediaFile.fsName : media.path;
             var sourceFileName = mediaFile && mediaFile.name ? decodeURIPath(mediaFile.name) : String(media.path || '').replace(/.*[\\/]/, '');
-            var extension = getFileExtension(sourceFileName);
-            if (bannedExtensionsLookup[extension] === true) {
-                ignoredBannedCount++;
-                continue;
-            }
             var diskFolderPath = FileManager_getRelativeFolderPath(sourcePath, projectRoot);
             var isExternal = diskFolderPath === null;
+            // Structure sync never consolidates external media; its scope is the project root only.
+            if (isExternal) {
+                continue;
+            }
             var targetFolder = projectRoot + (binPath ? '/' + binPath : '');
             var targetPath = targetFolder + '/' + sourceFileName;
             var targetFile = FileManager_createFileFromNativePath(targetPath);
@@ -2436,7 +2417,7 @@ function FileManager_analyzeStructure(rootPath, levels, bannedExtensionsJson) {
             });
         }
 
-        return JSON.stringify({ projectRoot: projectRoot, items: items, ignoredBannedCount: ignoredBannedCount });
+        return JSON.stringify({ projectRoot: projectRoot, items: items, ignoredBannedCount: 0 });
     } catch (e) {
         return JSON.stringify({ error: e.toString() });
     }

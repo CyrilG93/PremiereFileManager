@@ -236,17 +236,9 @@ body[data-active-tab="structure"] #resultsSection {
     margin-bottom: 4px;
 }
 
-.structure-intro p,
-.structure-option {
+.structure-intro p {
     color: var(--text-secondary);
     font-size: 12px;
-}
-
-.structure-option {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 2px;
 }
 
 .structure-results {

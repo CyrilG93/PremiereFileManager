@@ -62,7 +62,7 @@ Open the **Structure** tab to compare each media item's Premiere bin with its pa
 
 - **Premiere → disk** copies each selected file into the folder matching its bin, creates missing folders, then relinks the exact Premiere item. Existing destination files are shown as conflicts and are never overwritten.
 - **Disk → Premiere** moves each selected media item into a bin matching its current disk parent folder, creating missing bins when needed.
-- Keep **Consolidate external media** enabled to include media stored outside the project root when syncing from Premiere to disk.
+- Structure synchronization ignores media stored outside the project root; use **Consolidate** in the Media tab for those files.
 - File extensions listed as banned in Settings are ignored by both import and structure synchronization.
 
 The original file is never deleted by structure synchronization.

@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.1';
+let CURRENT_VERSION = '1.5.2';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2267,79 +2267,73 @@ function fm_setActivePanelTab(tabName) {
     structureSection.hidden = !isStructure;
 }
 
-// Render a safe, selectable structure discrepancy row without injecting media paths as HTML.
-function fm_createStructureRow(item, index, direction) {
+// Render one safe, selectable discrepancy row with both Premiere and disk locations side by side.
+function fm_createStructureRow(item, index, includeExternal) {
     const row = document.createElement('div');
     const checkbox = document.createElement('input');
-    const details = document.createElement('label');
-    const canRun = direction === 'disk'
-        ? item.sourceExists && !item.targetExists
-        : !item.external;
+    const mode = document.createElement('span');
+    const name = document.createElement('span');
+    const premiere = document.createElement('span');
+    const disk = document.createElement('span');
+    const canSyncToDisk = item.diskSyncNeeded && item.sourceExists && !item.targetExists && (includeExternal || !item.external);
+    const canSyncToPremiere = item.premiereSyncNeeded && !item.external;
 
-    row.className = 'file-item' + (item.targetExists ? ' conflict' : '');
+    row.className = 'structure-row' + (item.targetExists ? ' conflict' : '');
     checkbox.type = 'checkbox';
-    checkbox.id = `structure-${direction}-${index}`;
-    checkbox.checked = canRun;
-    checkbox.disabled = !canRun;
+    checkbox.id = `structure-${index}`;
+    checkbox.checked = canSyncToDisk || canSyncToPremiere;
+    checkbox.disabled = !(canSyncToDisk || canSyncToPremiere);
     checkbox.dataset.index = String(index);
     checkbox.addEventListener('change', fm_updateStructureCounts);
 
-    details.htmlFor = checkbox.id;
-    details.className = 'file-details';
-    const name = document.createElement('div');
-    const directionLine = document.createElement('div');
-    const current = document.createElement('div');
-    const target = document.createElement('div');
-    name.className = 'file-name';
-    directionLine.className = 'structure-direction';
-    current.className = 'file-path';
-    target.className = 'file-path';
+    mode.className = 'structure-cell structure-mode';
+    name.className = 'structure-cell file-name';
+    premiere.className = 'structure-cell structure-location';
+    disk.className = 'structure-cell structure-location';
+    mode.textContent = [item.diskSyncNeeded ? 'Premiere → disque' : '', item.premiereSyncNeeded ? 'Disque → Premiere' : ''].filter(Boolean).join(' · ');
     name.textContent = item.name;
-    directionLine.textContent = direction === 'disk'
-        ? `Chutier : ${item.binPath || 'Racine'}${item.external ? ' · média externe' : ''}`
-        : `Dossier : ${item.diskFolderPath || 'Racine'}`;
-    current.textContent = direction === 'disk' ? `Actuel : ${item.currentPath}` : `Chutier actuel : ${item.binPath || 'Racine'}`;
-    target.textContent = item.targetExists && direction === 'disk'
-        ? `Conflit : ${item.targetPath} existe déjà`
-        : (direction === 'disk' ? `Cible : ${item.targetPath}` : `Cible : ${item.targetBinPath || 'Racine'}`);
-    details.appendChild(name);
-    details.appendChild(directionLine);
-    details.appendChild(current);
-    details.appendChild(target);
+    premiere.textContent = item.binPath || 'Racine';
+    disk.textContent = item.external
+        ? `Externe : ${item.currentPath}`
+        : (item.diskFolderPath || 'Racine');
+    if (item.targetExists) {
+        disk.textContent += ' · conflit de destination';
+    }
     row.appendChild(checkbox);
-    row.appendChild(details);
+    row.appendChild(mode);
+    row.appendChild(name);
+    row.appendChild(premiere);
+    row.appendChild(disk);
     return row;
 }
 
-// Rebuild both discrepancy lists after an analysis or after the external-media option changes.
+// Rebuild one concise discrepancy list after an analysis or after the external-media option changes.
 function fm_renderStructureResults() {
     const includeExternal = document.getElementById('structureIncludeExternal').checked;
-    const diskList = document.getElementById('structureDiskList');
-    const premiereList = document.getElementById('structurePremiereList');
-    const diskItems = fm_structureItems.filter((item) => item.diskSyncNeeded && (includeExternal || !item.external));
-    const premiereItems = fm_structureItems.filter((item) => item.premiereSyncNeeded);
+    const structureList = document.getElementById('structureList');
+    const visibleItems = fm_structureItems.filter((item) =>
+        item.premiereSyncNeeded || (item.diskSyncNeeded && (includeExternal || !item.external))
+    );
 
-    diskList.innerHTML = '';
-    premiereList.innerHTML = '';
-    if (diskItems.length === 0) {
-        diskList.innerHTML = '<div class="empty-state"><p>Aucun fichier à déplacer vers sa structure de chutiers.</p></div>';
+    structureList.innerHTML = '';
+    if (visibleItems.length === 0) {
+        structureList.innerHTML = '<div class="empty-state"><p>Aucune différence de structure détectée.</p></div>';
     } else {
-        diskItems.forEach((item) => diskList.appendChild(fm_createStructureRow(item, fm_structureItems.indexOf(item), 'disk')));
-    }
-    if (premiereItems.length === 0) {
-        premiereList.innerHTML = '<div class="empty-state"><p>Aucun média à déplacer dans Premiere.</p></div>';
-    } else {
-        premiereItems.forEach((item) => premiereList.appendChild(fm_createStructureRow(item, fm_structureItems.indexOf(item), 'premiere')));
+        visibleItems.forEach((item) => structureList.appendChild(fm_createStructureRow(item, fm_structureItems.indexOf(item), includeExternal)));
     }
 
     document.getElementById('structureResults').hidden = false;
     fm_updateStructureCounts();
 }
 
-// Update action labels from the checked rows, including disabled conflict rows.
+// Update both action labels from the same selected rows and their valid direction.
 function fm_updateStructureCounts() {
-    const diskCount = document.querySelectorAll('#structureDiskList input:checked').length;
-    const premiereCount = document.querySelectorAll('#structurePremiereList input:checked').length;
+    const includeExternal = document.getElementById('structureIncludeExternal').checked;
+    const selectedItems = Array.from(document.querySelectorAll('#structureList input:checked'))
+        .map((checkbox) => fm_structureItems[Number(checkbox.dataset.index)])
+        .filter(Boolean);
+    const diskCount = selectedItems.filter((item) => item.diskSyncNeeded && item.sourceExists && !item.targetExists && (includeExternal || !item.external)).length;
+    const premiereCount = selectedItems.filter((item) => item.premiereSyncNeeded && !item.external).length;
     document.getElementById('structureDiskCount').textContent = String(diskCount);
     document.getElementById('structurePremiereCount').textContent = String(premiereCount);
     document.getElementById('syncToDiskBtn').disabled = diskCount === 0;
@@ -2348,9 +2342,12 @@ function fm_updateStructureCounts() {
 
 // Get selected reviewed rows, avoiding a fresh scan between review and action.
 function fm_getSelectedStructureItems(direction) {
-    return Array.from(document.querySelectorAll(`#structure${direction === 'disk' ? 'Disk' : 'Premiere'}List input:checked`))
+    const includeExternal = document.getElementById('structureIncludeExternal').checked;
+    return Array.from(document.querySelectorAll('#structureList input:checked'))
         .map((checkbox) => fm_structureItems[Number(checkbox.dataset.index)])
-        .filter(Boolean);
+        .filter((item) => item && (direction === 'disk'
+            ? item.diskSyncNeeded && item.sourceExists && !item.targetExists && (includeExternal || !item.external)
+            : item.premiereSyncNeeded && !item.external));
 }
 
 // Ask Premiere for its bin/media topology and calculate discrepancies in the host script.

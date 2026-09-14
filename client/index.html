@@ -229,22 +229,15 @@
                     <span>Consolider aussi les médias en dehors du dossier racine</span>
                 </label>
                 <button class="analyze-btn" id="analyzeStructureBtn" type="button">Analyser la structure</button>
-                <div class="dual-results structure-results" id="structureResults" hidden>
-                    <div class="result-column export-column">
-                        <div class="column-header">
-                            <h3>Premiere → disque</h3>
-                            <p class="column-subtitle">Copie dans le dossier correspondant au chutier, puis relie le média.</p>
-                        </div>
-                        <div class="files-list" id="structureDiskList"></div>
-                        <button class="action-btn export-action-btn" id="syncToDiskBtn" type="button">Synchroniser vers le disque (<span id="structureDiskCount">0</span>)</button>
+                <div class="structure-results" id="structureResults" hidden>
+                    <div class="structure-list-head" aria-hidden="true">
+                        <span></span><span>Mode</span><span>Fichier</span><span>Premiere</span><span>Disque</span>
                     </div>
-                    <div class="result-column import-column">
-                        <div class="column-header">
-                            <h3>Disque → Premiere</h3>
-                            <p class="column-subtitle">Déplace le média dans le chutier correspondant à son dossier.</p>
-                        </div>
-                        <div class="files-list" id="structurePremiereList"></div>
-                        <button class="action-btn import-action-btn" id="syncToPremiereBtn" type="button">Synchroniser vers Premiere (<span id="structurePremiereCount">0</span>)</button>
+                    <div class="files-list structure-list" id="structureList"></div>
+                    <!-- Direction buttons remain below the single reviewed list. -->
+                    <div class="structure-actions">
+                        <button class="action-btn export-action-btn" id="syncToDiskBtn" type="button">Vers le disque (<span id="structureDiskCount">0</span>)</button>
+                        <button class="action-btn import-action-btn" id="syncToPremiereBtn" type="button">Vers Premiere (<span id="structurePremiereCount">0</span>)</button>
                     </div>
                 </div>
             </section>

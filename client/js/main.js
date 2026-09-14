@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.4';
+let CURRENT_VERSION = '1.5.5';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2406,10 +2406,8 @@ async function fm_analyzeStructure() {
     analyzeButton.disabled = true;
     analyzeButton.textContent = 'Analyse en cours…';
     try {
-        const rawResult = await fm_evalScriptPromise(fm_buildHostCall('FileManager_analyzeStructure', [settings.rootFolder || '', settings.rootFolderLevels || 0]));
-        const result = rawResult === 'EvalScript error.'
-            ? await fm_analyzeStructureWithClientFallback()
-            : JSON.parse(rawResult);
+        // Keep structure comparison in the panel: it avoids loading new logic into Premiere's fragile ExtendScript engine.
+        const result = await fm_analyzeStructureWithClientFallback();
         if (result.error) {
             throw new Error(result.error);
         }

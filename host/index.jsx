@@ -2382,42 +2382,34 @@ function FileManager_analyzeStructure(rootPath, levels) {
             var media = analysis.files[i];
             var binPath = String(media.binPath || '').replace(/\\/g, '/');
             var mediaFile = FileManager_createFileFromNativePath(media.path);
-            // Use the real source filename: a Premiere clip can be renamed without renaming its disk file.
-            var sourcePath = mediaFile ? mediaFile.fsName : media.path;
-            var sourceFileName = mediaFile && mediaFile.name ? decodeURIPath(mediaFile.name) : String(media.path || '').replace(/.*[\\/]/, '');
-            var diskFolderPath = FileManager_getRelativeFolderPath(sourcePath, projectRoot);
+            var parentFolder = mediaFile && mediaFile.parent ? mediaFile.parent.fsName : '';
+            var diskFolderPath = FileManager_getRelativeFolderPath(media.path, projectRoot);
             var isExternal = diskFolderPath === null;
-            // Structure sync never consolidates external media; its scope is the project root only.
-            if (isExternal) {
-                continue;
-            }
             var targetFolder = projectRoot + (binPath ? '/' + binPath : '');
-            var targetPath = targetFolder + '/' + sourceFileName;
+            var targetPath = targetFolder + '/' + media.name;
             var targetFile = FileManager_createFileFromNativePath(targetPath);
-            var canonicalTargetPath = targetFile ? targetFile.fsName : targetPath;
-            var sameDiskPath = normalizeComparablePath(sourcePath) === normalizeComparablePath(canonicalTargetPath);
+            var sameDiskPath = normalizeComparablePath(media.path) === normalizeComparablePath(targetPath);
             var normalizedBin = binPath.toLowerCase();
             var normalizedDiskFolder = String(diskFolderPath || '').toLowerCase();
 
-            logPlatform('STRUCTURE: ' + sourceFileName + ' bin=' + binPath + ' disk=' + (diskFolderPath === null ? 'EXTERNAL' : diskFolderPath) + ' sameDisk=' + sameDiskPath, 'debug');
-
             items.push({
-                name: sourceFileName,
+                name: media.name,
                 nodeId: media.nodeId || '',
-                currentPath: sourcePath,
+                currentPath: media.path,
                 binPath: binPath,
                 diskFolderPath: diskFolderPath,
                 external: isExternal,
-                targetPath: canonicalTargetPath,
+                targetPath: targetPath,
                 targetBinPath: diskFolderPath === null ? '' : diskFolderPath,
                 diskSyncNeeded: !sameDiskPath,
                 premiereSyncNeeded: !isExternal && normalizedBin !== normalizedDiskFolder,
                 targetExists: !sameDiskPath && targetFile && targetFile.exists,
-                sourceExists: mediaFile && mediaFile.exists
+                sourceExists: mediaFile && mediaFile.exists,
+                parentFolder: parentFolder
             });
         }
 
-        return JSON.stringify({ projectRoot: projectRoot, items: items, ignoredBannedCount: 0 });
+        return JSON.stringify({ projectRoot: projectRoot, items: items });
     } catch (e) {
         return JSON.stringify({ error: e.toString() });
     }

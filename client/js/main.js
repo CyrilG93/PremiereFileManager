@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.9';
+let CURRENT_VERSION = '1.5.10';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2534,13 +2534,15 @@ async function fm_syncStructureToDisk() {
     const selectedItems = fm_getSelectedStructureItems('disk');
     const actionButton = document.getElementById('syncToDiskBtn');
     if (selectedItems.length === 0) {
+        showStatus('Aucun média sélectionné et disponible pour une synchronisation vers le disque.', 'warning');
         return;
     }
-    // Do not race a structure move against an auto-import batch that could add a duplicate item.
-    if (isImporting) {
+    // A real import batch may create project items, while an idle background scan can safely be pre-empted.
+    if (importActivity === 'batch') {
         showStatus('Import en cours : attendez sa fin avant de synchroniser la structure.', 'warning');
         return;
     }
+    debugLog(`[Structure] Synchronisation vers le disque démarrée (${selectedItems.length} média(s))`, 'info');
     actionButton.disabled = true;
     fm_beginConsolidation();
     showConsolidationProgress(selectedItems.length);
@@ -3328,6 +3330,7 @@ async function compactExport() {
 // Auto-import functionality
 let autoImportTimer = null;
 let isImporting = false; // Lock to prevent multiple simultaneous imports
+let importActivity = 'idle'; // Distinguish a lightweight scan from an actual media-import batch.
 let activeConsolidations = 0;
 
 // Track overlapping consolidation commands so auto-import resumes only after the final one completes.
@@ -3426,6 +3429,7 @@ function importSelected() {
 
     // Set lock for manual import
     isImporting = true;
+    importActivity = 'batch';
     debugLog('Verrou activé, isImporting = true', 'info');
 
     showProgress();
@@ -3465,6 +3469,7 @@ function importSelected() {
         } finally {
             debugLog('Libération du verrou', 'info');
             isImporting = false;
+            importActivity = 'idle';
         }
     })();
 
@@ -3490,6 +3495,7 @@ function startAutoImport() {
 
         // Set lock
         isImporting = true;
+        importActivity = 'scan';
 
         try {
             const rootPath = settings.rootFolder || '';
@@ -3506,6 +3512,7 @@ function startAutoImport() {
                     if (fm_isConsolidating()) {
                         console.log('Auto-import: Consolidation started during scan, skipping import.');
                         isImporting = false;
+                        importActivity = 'idle';
                         return;
                     }
 
@@ -3514,6 +3521,7 @@ function startAutoImport() {
                     if (data.error) {
                         console.error('Auto-import scan error:', data.error);
                         isImporting = false;
+                        importActivity = 'idle';
                         return;
                     }
 
@@ -3524,10 +3532,12 @@ function startAutoImport() {
                         if (fm_isConsolidating()) {
                             console.log('Auto-import: Consolidation in progress, skipping detected files.');
                             isImporting = false;
+                            importActivity = 'idle';
                             return;
                         }
 
                         try {
+                            importActivity = 'batch';
                             const importOutcome = await fm_importFilesInBatches(newFiles, {
                                 contextLabel: 'auto import',
                                 enableSuggestedAutoBan: true
@@ -3542,19 +3552,23 @@ function startAutoImport() {
                             console.error('Auto-import import error:', importError);
                         } finally {
                             isImporting = false;
+                            importActivity = 'idle';
                         }
                     } else {
                         // No files to import, release lock immediately
                         isImporting = false;
+                        importActivity = 'idle';
                     }
                 } catch (e) { // Catch for parsing scan result
                     console.error('Auto-import scan error (parsing result):', e);
                     isImporting = false;
+                    importActivity = 'idle';
                 }
             });
         } catch (e) { // Catch for errors within the setInterval callback before evalScript returns
             console.error('Auto-import error:', e);
             isImporting = false;
+            importActivity = 'idle';
         }
     }, interval);
 

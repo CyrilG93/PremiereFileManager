@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.10';
+let CURRENT_VERSION = '1.5.11';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -239,6 +239,23 @@ const baseTranslations = {
         importButton: "Import",
         exportButton: "Consolidate"
     },
+    structure: {
+        tab: "Structure",
+        title: "Structure synchronization",
+        intro: "Compares Premiere bins with folders in the project. External media is ignored.",
+        analyze: "Analyze structure",
+        analyzing: "Analyzing structure…",
+        mode: "Mode",
+        file: "File",
+        premiere: "Premiere",
+        disk: "Disk",
+        premiereToDisk: "Premiere → disk",
+        diskToPremiere: "Disk → Premiere",
+        toDisk: "To disk",
+        toPremiere: "To Premiere",
+        empty: "No structure difference detected.",
+        destinationConflict: "destination conflict"
+    },
     report: {
         title: "Consolidation Report",
         success: "Success",
@@ -324,6 +341,23 @@ const translations = {
             importButton: "Importieren",
             exportButton: "Konsolidieren"
         },
+        structure: {
+            tab: "Struktur",
+            title: "Struktursynchronisierung",
+            intro: "Vergleicht Premiere-Bins mit Ordnern im Projekt. Externe Medien werden ignoriert.",
+            analyze: "Struktur analysieren",
+            analyzing: "Struktur wird analysiert…",
+            mode: "Modus",
+            file: "Datei",
+            premiere: "Premiere",
+            disk: "Datenträger",
+            premiereToDisk: "Premiere → Datenträger",
+            diskToPremiere: "Datenträger → Premiere",
+            toDisk: "Zum Datenträger",
+            toPremiere: "Zu Premiere",
+        empty: "Keine Strukturabweichung erkannt.",
+        destinationConflict: "Zielkonflikt"
+        },
         report: {
             title: "Konsolidierungsbericht",
             success: "Erfolg",
@@ -405,6 +439,23 @@ const translations = {
             exportSubtitle: "De Premiere Pro → carpeta",
             importButton: "Importar",
             exportButton: "Consolidar"
+        },
+        structure: {
+            tab: "Estructura",
+            title: "Sincronización de estructura",
+            intro: "Compara los contenedores de Premiere con las carpetas del proyecto. Los medios externos se ignoran.",
+            analyze: "Analizar estructura",
+            analyzing: "Analizando estructura…",
+            mode: "Modo",
+            file: "Archivo",
+            premiere: "Premiere",
+            disk: "Disco",
+            premiereToDisk: "Premiere → disco",
+            diskToPremiere: "Disco → Premiere",
+            toDisk: "Al disco",
+            toPremiere: "A Premiere",
+        empty: "No se detectó ninguna diferencia de estructura.",
+        destinationConflict: "conflicto de destino"
         },
         report: {
             title: "Informe de consolidación",
@@ -493,6 +544,23 @@ const translations = {
             importButton: "Importer",
             exportButton: "Consolider"
         },
+        structure: {
+            tab: "Structure",
+            title: "Synchronisation de structure",
+            intro: "Compare les chutiers Premiere avec les dossiers présents dans le projet. Les médias externes sont ignorés.",
+            analyze: "Analyser la structure",
+            analyzing: "Analyse de la structure…",
+            mode: "Mode",
+            file: "Fichier",
+            premiere: "Premiere",
+            disk: "Disque",
+            premiereToDisk: "Premiere → disque",
+            diskToPremiere: "Disque → Premiere",
+            toDisk: "Vers le disque",
+            toPremiere: "Vers Premiere",
+        empty: "Aucune différence de structure détectée.",
+        destinationConflict: "conflit de destination"
+        },
         report: {
             title: "Rapport de Consolidation",
             success: "Succès",
@@ -574,6 +642,23 @@ const translations = {
             exportSubtitle: "Da Premiere Pro → cartella",
             importButton: "Importa",
             exportButton: "Consolida"
+        },
+        structure: {
+            tab: "Struttura",
+            title: "Sincronizzazione struttura",
+            intro: "Confronta i bin di Premiere con le cartelle del progetto. I media esterni vengono ignorati.",
+            analyze: "Analizza struttura",
+            analyzing: "Analisi della struttura…",
+            mode: "Modalità",
+            file: "File",
+            premiere: "Premiere",
+            disk: "Disco",
+            premiereToDisk: "Premiere → disco",
+            diskToPremiere: "Disco → Premiere",
+            toDisk: "Verso il disco",
+            toPremiere: "Verso Premiere",
+        empty: "Nessuna differenza di struttura rilevata.",
+        destinationConflict: "conflitto di destinazione"
         },
         report: {
             title: "Report di consolidazione",
@@ -657,6 +742,23 @@ const translations = {
             importButton: "Importar",
             exportButton: "Consolidar"
         },
+        structure: {
+            tab: "Estrutura",
+            title: "Sincronização de estrutura",
+            intro: "Compara as bins do Premiere com as pastas do projeto. Mídias externas são ignoradas.",
+            analyze: "Analisar estrutura",
+            analyzing: "Analisando estrutura…",
+            mode: "Modo",
+            file: "Arquivo",
+            premiere: "Premiere",
+            disk: "Disco",
+            premiereToDisk: "Premiere → disco",
+            diskToPremiere: "Disco → Premiere",
+            toDisk: "Para o disco",
+            toPremiere: "Para o Premiere",
+        empty: "Nenhuma diferença de estrutura detectada.",
+        destinationConflict: "conflito de destino"
+        },
         report: {
             title: "Relatório de consolidação",
             success: "Sucesso",
@@ -738,6 +840,23 @@ const translations = {
             exportSubtitle: "Из Premiere Pro → в папку",
             importButton: "Импорт",
             exportButton: "Консолидация"
+        },
+        structure: {
+            tab: "Структура",
+            title: "Синхронизация структуры",
+            intro: "Сравнивает бины Premiere с папками проекта. Внешние медиафайлы игнорируются.",
+            analyze: "Анализировать структуру",
+            analyzing: "Анализ структуры…",
+            mode: "Режим",
+            file: "Файл",
+            premiere: "Premiere",
+            disk: "Диск",
+            premiereToDisk: "Premiere → диск",
+            diskToPremiere: "Диск → Premiere",
+            toDisk: "На диск",
+            toPremiere: "В Premiere",
+        empty: "Различий в структуре не обнаружено.",
+        destinationConflict: "конфликт назначения"
         },
         report: {
             title: "Отчёт о консолидации",
@@ -821,6 +940,23 @@ const translations = {
             importButton: "インポート",
             exportButton: "統合"
         },
+        structure: {
+            tab: "構造",
+            title: "構造の同期",
+            intro: "Premiereのビンとプロジェクト内のフォルダーを比較します。外部メディアは無視されます。",
+            analyze: "構造を解析",
+            analyzing: "構造を解析中…",
+            mode: "モード",
+            file: "ファイル",
+            premiere: "Premiere",
+            disk: "ディスク",
+            premiereToDisk: "Premiere → ディスク",
+            diskToPremiere: "ディスク → Premiere",
+            toDisk: "ディスクへ",
+            toPremiere: "Premiereへ",
+        empty: "構造の違いは検出されませんでした。",
+        destinationConflict: "保存先の競合"
+        },
         report: {
             title: "統合レポート",
             success: "成功",
@@ -902,6 +1038,23 @@ const translations = {
             exportSubtitle: "Premiere Pro → 文件夹",
             importButton: "导入",
             exportButton: "整合"
+        },
+        structure: {
+            tab: "结构",
+            title: "结构同步",
+            intro: "比较 Premiere 素材箱与项目中的文件夹。外部媒体将被忽略。",
+            analyze: "分析结构",
+            analyzing: "正在分析结构…",
+            mode: "模式",
+            file: "文件",
+            premiere: "Premiere",
+            disk: "磁盘",
+            premiereToDisk: "Premiere → 磁盘",
+            diskToPremiere: "磁盘 → Premiere",
+            toDisk: "到磁盘",
+            toPremiere: "到 Premiere",
+        empty: "未检测到结构差异。",
+        destinationConflict: "目标冲突"
         },
         report: {
             title: "整合报告",
@@ -996,6 +1149,10 @@ function changeLanguage(lang) {
         currentLang = lang;
         updateUILanguage();
         fm_renderFolderLabelRules();
+        // Rebuild current structure rows so their direction labels follow the selected language too.
+        if (!document.getElementById('structureResults').hidden) {
+            fm_renderStructureResults();
+        }
 
         // Save to settings
         settings.language = lang;
@@ -2291,14 +2448,14 @@ function fm_createStructureRow(item, index) {
     name.className = 'structure-cell file-name';
     premiere.className = 'structure-cell structure-location';
     disk.className = 'structure-cell structure-location';
-    mode.textContent = [item.diskSyncNeeded ? 'Premiere → disque' : '', item.premiereSyncNeeded ? 'Disque → Premiere' : ''].filter(Boolean).join(' · ');
+    mode.textContent = [item.diskSyncNeeded ? t('structure.premiereToDisk') : '', item.premiereSyncNeeded ? t('structure.diskToPremiere') : ''].filter(Boolean).join(' · ');
     name.textContent = item.name;
-    premiere.textContent = item.binPath || 'Racine';
+    premiere.textContent = item.binPath || t('labels.binDefault');
     disk.textContent = item.external
         ? `Externe : ${item.currentPath}`
-        : (item.diskFolderPath || 'Racine');
+        : (item.diskFolderPath || t('labels.binDefault'));
     if (item.targetExists) {
-        disk.textContent += ' · conflit de destination';
+        disk.textContent += ` · ${t('structure.destinationConflict')}`;
     }
     row.appendChild(checkbox);
     row.appendChild(mode);
@@ -2315,7 +2472,7 @@ function fm_renderStructureResults() {
 
     structureList.innerHTML = '';
     if (visibleItems.length === 0) {
-        structureList.innerHTML = '<div class="empty-state"><p>Aucune différence de structure détectée.</p></div>';
+        structureList.innerHTML = `<div class="empty-state"><p>${escapeHtml(t('structure.empty'))}</p></div>`;
     } else {
         visibleItems.forEach((item) => structureList.appendChild(fm_createStructureRow(item, fm_structureItems.indexOf(item))));
     }
@@ -2425,7 +2582,7 @@ async function fm_analyzeStructureWithClientFallback() {
 async function fm_analyzeStructure() {
     const analyzeButton = document.getElementById('analyzeStructureBtn');
     analyzeButton.disabled = true;
-    analyzeButton.textContent = 'Analyse en cours…';
+    analyzeButton.textContent = t('structure.analyzing');
     try {
         // Keep structure comparison in the panel: it avoids loading new logic into Premiere's fragile ExtendScript engine.
         const result = await fm_analyzeStructureWithClientFallback();
@@ -2442,7 +2599,7 @@ async function fm_analyzeStructure() {
         showStatus(`Erreur d'analyse de structure : ${error.message}`, 'error');
     } finally {
         analyzeButton.disabled = false;
-        analyzeButton.textContent = 'Analyser la structure';
+        analyzeButton.textContent = t('structure.analyze');
     }
 }
 

@@ -68,7 +68,7 @@
             <!-- Tabs keep media import/consolidation separate from structure synchronization. -->
             <div class="panel-tabs" role="tablist" aria-label="File Manager sections">
                 <button class="panel-tab active" id="mediaTabBtn" type="button" role="tab" aria-selected="true">Médias</button>
-                <button class="panel-tab" id="structureTabBtn" type="button" role="tab" aria-selected="false">Structure</button>
+                <button class="panel-tab" id="structureTabBtn" type="button" role="tab" aria-selected="false" data-i18n="structure.tab">Structure</button>
             </div>
             <div class="project-info" id="projectInfo">
                 <div class="info-item">
@@ -221,20 +221,20 @@
             <!-- Structure synchronization prefers native moves and copies only between volumes. -->
             <section class="structure-section" id="structureSection" data-tab-panel="structure" hidden>
                 <div class="structure-intro">
-                    <h2>Synchronisation de structure</h2>
-                    <p>Compare uniquement les chutiers Premiere avec les dossiers présents dans le projet. Les médias externes sont ignorés.</p>
+                    <h2 data-i18n="structure.title">Synchronisation de structure</h2>
+                    <p data-i18n="structure.intro">Compare uniquement les chutiers Premiere avec les dossiers présents dans le projet. Les médias externes sont ignorés.</p>
                 </div>
-                <button class="analyze-btn" id="analyzeStructureBtn" type="button">Analyser la structure</button>
+                <button class="analyze-btn" id="analyzeStructureBtn" type="button" data-i18n="structure.analyze">Analyser la structure</button>
                 <div class="structure-results" id="structureResults" hidden>
+                    <!-- Direction actions come first, so selection and execution stay close together. -->
+                    <div class="structure-actions">
+                        <button class="action-btn export-action-btn" id="syncToDiskBtn" type="button"><span data-i18n="structure.toDisk">Vers le disque</span> (<span id="structureDiskCount">0</span>)</button>
+                        <button class="action-btn import-action-btn" id="syncToPremiereBtn" type="button"><span data-i18n="structure.toPremiere">Vers Premiere</span> (<span id="structurePremiereCount">0</span>)</button>
+                    </div>
                     <div class="structure-list-head" aria-hidden="true">
-                        <span></span><span>Mode</span><span>Fichier</span><span>Premiere</span><span>Disque</span>
+                        <span></span><span data-i18n="structure.mode">Mode</span><span data-i18n="structure.file">Fichier</span><span data-i18n="structure.premiere">Premiere</span><span data-i18n="structure.disk">Disque</span>
                     </div>
                     <div class="files-list structure-list" id="structureList"></div>
-                    <!-- Direction buttons remain below the single reviewed list. -->
-                    <div class="structure-actions">
-                        <button class="action-btn export-action-btn" id="syncToDiskBtn" type="button">Vers le disque (<span id="structureDiskCount">0</span>)</button>
-                        <button class="action-btn import-action-btn" id="syncToPremiereBtn" type="button">Vers Premiere (<span id="structurePremiereCount">0</span>)</button>
-                    </div>
                 </div>
             </section>
         </main>

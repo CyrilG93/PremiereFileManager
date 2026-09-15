@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.8';
+let CURRENT_VERSION = '1.5.9';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2534,6 +2534,11 @@ async function fm_syncStructureToDisk() {
     const selectedItems = fm_getSelectedStructureItems('disk');
     const actionButton = document.getElementById('syncToDiskBtn');
     if (selectedItems.length === 0) {
+        return;
+    }
+    // Do not race a structure move against an auto-import batch that could add a duplicate item.
+    if (isImporting) {
+        showStatus('Import en cours : attendez sa fin avant de synchroniser la structure.', 'warning');
         return;
     }
     actionButton.disabled = true;

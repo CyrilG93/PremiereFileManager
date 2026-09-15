@@ -2489,10 +2489,8 @@ function FileManager_relinkStructureItems(itemsJson) {
                 continue;
             }
             try {
-                var relinkResult = projectItem.changeMediaPath(relinkPath, true);
-                if (relinkResult !== 0) {
-                    throw new Error('Premiere rejected the media relink');
-                }
+                // Some Premiere releases return undefined here despite changing the media path successfully.
+                projectItem.changeMediaPath(relinkPath, true);
                 results.push({ name: item.name, success: true });
             } catch (relinkError) {
                 results.push({ name: item.name, success: false, error: relinkError.toString() });

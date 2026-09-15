@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.7';
+let CURRENT_VERSION = '1.5.8';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2481,7 +2481,55 @@ function fm_removeMovedStructureSources(items) {
     });
 }
 
-// Move selected files into their Premiere-bin paths by copying, relinking, then safely removing originals.
+// Move one file with a filesystem rename when source and destination share a volume.
+function fm_tryNativeStructureMove(item) {
+    try {
+        const sourcePath = fm_path.resolve(item.currentPath);
+        const destinationPath = fm_path.resolve(item.targetPath);
+        if (sourcePath === destinationPath) {
+            throw new Error('Source and destination are identical');
+        }
+        if (!fm_fs.existsSync(sourcePath) || !fm_fs.statSync(sourcePath).isFile()) {
+            throw new Error('Source file is unavailable');
+        }
+        if (fm_fs.existsSync(destinationPath)) {
+            throw new Error('Destination already exists');
+        }
+        fm_fs.mkdirSync(fm_path.dirname(destinationPath), { recursive: true });
+        fm_fs.renameSync(sourcePath, destinationPath);
+        debugLog(`[Structure] Native move: ${sourcePath} -> ${destinationPath}`, 'info');
+        return { item, success: true, mode: 'native' };
+    } catch (error) {
+        // Only a cross-device move may fall back to copying; other errors must preserve the source.
+        if (error && error.code === 'EXDEV') {
+            debugLog(`[Structure] Cross-volume move, copy fallback required: ${item.currentPath}`, 'info');
+            return { item, success: false, fallbackCopy: true };
+        }
+        debugLog(`[Structure] Native move failed: ${item.currentPath} (${error.message})`, 'warning');
+        return { item, success: false, error: error.message };
+    }
+}
+
+// Restore files moved natively when Premiere cannot relink them to their new location.
+function fm_rollbackNativeStructureMoves(entries) {
+    return (entries || []).map((entry) => {
+        try {
+            const sourcePath = fm_path.resolve(entry.item.currentPath);
+            const destinationPath = fm_path.resolve(entry.item.targetPath);
+            if (!fm_fs.existsSync(destinationPath) || fm_fs.existsSync(sourcePath)) {
+                throw new Error('Rollback paths are not safe');
+            }
+            fm_fs.renameSync(destinationPath, sourcePath);
+            debugLog(`[Structure] Native move restored: ${destinationPath} -> ${sourcePath}`, 'warning');
+            return { name: entry.item.name, success: true };
+        } catch (error) {
+            debugLog(`[Structure] Could not restore native move: ${entry.item.currentPath} (${error.message})`, 'error');
+            return { name: entry.item.name, success: false, error: error.message };
+        }
+    });
+}
+
+// Move selected files into their Premiere-bin paths, then relink the exact Premiere items.
 async function fm_syncStructureToDisk() {
     const selectedItems = fm_getSelectedStructureItems('disk');
     const actionButton = document.getElementById('syncToDiskBtn');
@@ -2493,37 +2541,69 @@ async function fm_syncStructureToDisk() {
     showConsolidationProgress(selectedItems.length);
     let movedCount = 0;
     let retainedCount = 0;
+    let nativeEntriesToRestore = [];
     try {
-        const copyResults = await copyFiles(selectedItems.map((item) => ({
-            name: item.name,
-            source: item.currentPath,
-            destination: item.targetPath
-        })), (progress) => {
-            updateConsolidationProgress(progress.current, progress.total, selectedItems[progress.current - 1].name, Date.now());
-        });
-        const copiedItems = copyResults
-            .map((result, index) => result.success && !result.skipped ? selectedItems[index] : null)
-            .filter(Boolean);
-        if (copiedItems.length > 0) {
+        const startedAt = Date.now();
+        const moveAttempts = selectedItems.map(fm_tryNativeStructureMove);
+        const nativeEntries = moveAttempts.filter((entry) => entry.success);
+        nativeEntriesToRestore = nativeEntries;
+        const fallbackItems = moveAttempts.filter((entry) => entry.fallbackCopy).map((entry) => entry.item);
+        const directFailures = moveAttempts.filter((entry) => !entry.success && !entry.fallbackCopy);
+        let copyResults = [];
+        let copiedEntries = [];
+
+        // Copy only files that cannot be renamed because the paths are on different volumes.
+        if (fallbackItems.length > 0) {
+            updateConsolidationProgressText('Copie entre volumes…');
+            copyResults = await copyFiles(fallbackItems.map((item) => ({
+                name: item.name,
+                source: item.currentPath,
+                destination: item.targetPath
+            })), (progress) => {
+                updateConsolidationProgress(progress.current, fallbackItems.length, fallbackItems[progress.current - 1].name, startedAt);
+            });
+            copiedEntries = copyResults
+                .map((result, index) => result.success && !result.skipped ? { item: fallbackItems[index], success: true, mode: 'copy' } : null)
+                .filter(Boolean);
+        }
+
+        const readyEntries = nativeEntries.concat(copiedEntries);
+        if (readyEntries.length > 0) {
             updateConsolidationProgressText('Liaison des médias…');
-            const rawRelink = await fm_evalScriptPromise(fm_buildHostCall('FileManager_relinkStructureItems', [JSON.stringify(copiedItems)]));
+            const readyItems = readyEntries.map((entry) => entry.item);
+            const rawRelink = await fm_evalScriptPromise(fm_buildHostCall('FileManager_relinkStructureItems', [JSON.stringify(readyItems)]));
             const relinkResult = JSON.parse(rawRelink);
             if (relinkResult.error) {
                 throw new Error(relinkResult.error);
             }
             const relinkEntries = Array.isArray(relinkResult.results) ? relinkResult.results : [];
-            const relinkedItems = copiedItems.filter((item, index) => relinkEntries[index] && relinkEntries[index].success === true);
-            updateConsolidationProgressText('Déplacement des fichiers…');
-            const removalResults = fm_removeMovedStructureSources(relinkedItems);
-            movedCount = removalResults.filter((entry) => entry.success).length;
-            retainedCount = copiedItems.length - movedCount;
+            const relinkedEntries = readyEntries.filter((entry, index) => relinkEntries[index] && relinkEntries[index].success === true);
+            const unrelinkedNativeEntries = readyEntries.filter((entry, index) => entry.mode === 'native' && !(relinkEntries[index] && relinkEntries[index].success === true));
+            nativeEntriesToRestore = unrelinkedNativeEntries;
+            const relinkedCopiedItems = relinkedEntries.filter((entry) => entry.mode === 'copy').map((entry) => entry.item);
+            const unrelinkedCopiedCount = copiedEntries.length - relinkedCopiedItems.length;
+
+            // A copied fallback keeps its original until relinking and size verification both succeed.
+            const removalResults = fm_removeMovedStructureSources(relinkedCopiedItems);
+            const removedCopiedCount = removalResults.filter((entry) => entry.success).length;
+            const relinkedNativeCount = relinkedEntries.filter((entry) => entry.mode === 'native').length;
+            fm_rollbackNativeStructureMoves(unrelinkedNativeEntries);
+            nativeEntriesToRestore = [];
+            movedCount = relinkedNativeCount + removedCopiedCount;
+            retainedCount = relinkedCopiedItems.length - removedCopiedCount + unrelinkedCopiedCount;
+            // A failed relink after a native move is restored, so it is a failure but not a retained duplicate.
+            directFailures.push.apply(directFailures, unrelinkedNativeEntries);
         }
-        const failedCount = copyResults.filter((result) => !result.success).length;
+        const failedCount = directFailures.length + copyResults.filter((result) => !result.success).length;
         const warningCount = failedCount + retainedCount;
         const message = `${movedCount} fichier(s) déplacé(s) vers le disque${retainedCount ? ` · ${retainedCount} original(aux) conservé(s)` : ''}`;
         showStatus(warningCount ? `${message} · ${warningCount} problème(s)` : message, warningCount ? 'warning' : 'success');
         await fm_analyzeStructure();
     } catch (error) {
+        // If the relink request itself fails, put native moves back before reporting the error.
+        if (nativeEntriesToRestore.length > 0) {
+            fm_rollbackNativeStructureMoves(nativeEntriesToRestore);
+        }
         console.error('Structure disk sync error:', error);
         showStatus(`Erreur de synchronisation vers le disque : ${error.message}`, 'error');
     } finally {

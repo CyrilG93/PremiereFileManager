@@ -137,6 +137,11 @@ For issues, questions, or feature requests, please send me a message on Discord.
 
 ## Changelog
 
+### v1.5.11 - 2026-09-16
+- Added the Structure tab to compare Premiere bins with folders on disk and synchronize selected differences in either direction.
+- Structure synchronization moves files instantly when both locations are on the same volume, while keeping a safe copy fallback for different volumes.
+- Added translated Structure controls and improved protection against auto-import duplicates during synchronization.
+
 ### v1.5.0 - 2026-08-23
 - Added automatic Premiere labels based on each media file's source folder.
 - Auto-import now pauses during consolidation and resumes automatically afterwards.

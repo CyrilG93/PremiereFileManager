@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.12';
+let CURRENT_VERSION = '1.5.13';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2247,6 +2247,56 @@ function updateExportCount() {
     document.getElementById('exportBtn').disabled = checked === 0;
 }
 
+// Build relink requests for newly copied files and for verified copies already present at their destination.
+function fm_buildConsolidationRelinkList(sourceFiles, copyResults) {
+    return (copyResults || []).map((result, index) => {
+        const sourceFile = (sourceFiles || [])[index];
+        if (!sourceFile || !result || !result.success) {
+            return null;
+        }
+
+        if (result.skipped) {
+            try {
+                const sourceStats = fm_fs.statSync(sourceFile.currentPath);
+                const targetStats = fm_fs.statSync(sourceFile.targetPath);
+                if (!sourceStats.isFile() || !targetStats.isFile() || sourceStats.size !== targetStats.size) {
+                    debugLog(`[Consolidation] Relink skipped for ${sourceFile.name}: destination verification failed`, 'warning');
+                    return null;
+                }
+                debugLog(`[Consolidation] Existing destination verified for relink: ${sourceFile.name}`, 'info');
+            } catch (error) {
+                debugLog(`[Consolidation] Relink skipped for ${sourceFile.name}: ${error.message}`, 'warning');
+                return null;
+            }
+        }
+
+        return {
+            name: sourceFile.name,
+            oldPath: sourceFile.currentPath,
+            newPath: sourceFile.targetPath
+        };
+    }).filter(Boolean);
+}
+
+// Relink every copied or verified existing destination through the established Premiere batch operation.
+async function fm_relinkConsolidatedFiles(sourceFiles, copyResults) {
+    const relinkList = fm_buildConsolidationRelinkList(sourceFiles, copyResults);
+    if (relinkList.length === 0) {
+        return [];
+    }
+
+    const rawResult = await fm_evalScriptPromise(fm_buildHostCall('FileManager_batchRelinkMedia', [JSON.stringify(relinkList)]));
+    try {
+        const result = JSON.parse(rawResult);
+        const relinkResults = Array.isArray(result.results) ? result.results : [];
+        debugLog(`[Consolidation] ${relinkResults.filter((entry) => entry.success).length}/${relinkList.length} média(s) relié(s)`, 'info');
+        return relinkResults;
+    } catch (error) {
+        debugLog(`[Consolidation] Relink result could not be read: ${rawResult}`, 'warning');
+        return [];
+    }
+}
+
 // Export selected files
 async function exportSelected() {
     const selectedFiles = exportFiles.filter((_, index) => {
@@ -2292,29 +2342,7 @@ async function exportSelected() {
         // Relink media in Premiere Pro to point to new location
         if (settings.autoRelink) {
             updateConsolidationProgressText('Liaison des médias...');
-
-            const relinkList = results
-                .filter(r => r.success && !r.skipped)
-                .map((r, i) => {
-                    // Escape backslashes for Windows in file paths
-                    const oldPath = selectedFiles[i].currentPath.replace(/\\/g, '\\\\');
-                    const newPath = selectedFiles[i].targetPath.replace(/\\/g, '\\\\');
-                    return {
-                        name: r.name,
-                        oldPath: oldPath,
-                        newPath: newPath
-                    };
-                });
-
-            if (relinkList.length > 0) {
-                await new Promise((resolve) => {
-                    const relinkJson = JSON.stringify(relinkList);
-                    csInterface.evalScript(fm_buildHostCall('FileManager_batchRelinkMedia', [relinkJson]), (result) => {
-                        console.log('Relink result:', result);
-                        resolve();
-                    });
-                });
-            }
+            await fm_relinkConsolidatedFiles(selectedFiles, results);
         }
 
         // Hide progress after short delay
@@ -3097,22 +3125,7 @@ async function synchronizeFiles() {
         // Relink media if enabled
         if (settings.autoRelink) {
             updateProgress(100, 'Liaison des médias...');
-
-            const relinkList = results
-                .filter(r => r.success && !r.skipped)
-                .map((r, i) => ({
-                    name: r.name,
-                    oldPath: selectedFiles[i].currentPath,
-                    newPath: selectedFiles[i].targetPath
-                }));
-
-            if (relinkList.length > 0) {
-                await new Promise((resolve) => {
-                    csInterface.evalScript(fm_buildHostCall('FileManager_batchRelinkMedia', [JSON.stringify(relinkList)]), (result) => {
-                        resolve();
-                    });
-                });
-            }
+            await fm_relinkConsolidatedFiles(selectedFiles, results);
         }
 
         hideProgress();
@@ -3246,22 +3259,7 @@ async function compactSync() {
             // Relink media if enabled
             if (settings.autoRelink) {
                 compactStatus.textContent = 'Liaison...';
-
-                const relinkList = results
-                    .filter(r => r.success && !r.skipped)
-                    .map((r, i) => ({
-                        name: r.name,
-                        oldPath: filesToSync[i].currentPath,
-                        newPath: filesToSync[i].targetPath
-                    }));
-
-                if (relinkList.length > 0) {
-                    await new Promise((resolve) => {
-                        csInterface.evalScript(fm_buildHostCall('FileManager_batchRelinkMedia', [JSON.stringify(relinkList)]), () => {
-                            resolve();
-                        });
-                    });
-                }
+                await fm_relinkConsolidatedFiles(filesToSync, results);
             }
 
             const successCount = results.filter(r => r.success).length;
@@ -3451,25 +3449,7 @@ async function compactExport() {
 
             // Relink if enabled
             if (settings.autoRelink) {
-                const relinkList = results
-                    .filter(r => r.success && !r.skipped)
-                    .map((r, i) => {
-                        // Escape backslashes for Windows in file paths
-                        const oldPath = filesToExport[i].currentPath.replace(/\\/g, '\\\\');
-                        const newPath = filesToExport[i].targetPath.replace(/\\/g, '\\\\');
-                        return {
-                            name: r.name,
-                            oldPath: oldPath,
-                            newPath: newPath
-                        };
-                    });
-
-                if (relinkList.length > 0) {
-                    await new Promise((resolve) => {
-                        const relinkJson = JSON.stringify(relinkList);
-                        csInterface.evalScript(fm_buildHostCall('FileManager_batchRelinkMedia', [relinkJson]), () => resolve());
-                    });
-                }
+                await fm_relinkConsolidatedFiles(filesToExport, results);
             }
 
             compactExportBtn.disabled = false;

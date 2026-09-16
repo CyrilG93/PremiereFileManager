@@ -54,7 +54,7 @@ A powerful Adobe Premiere Pro extension for managing project files, importing me
 
 ### Consolidate Files
 
-The extension will detect files that are used in your project but located outside your project folder. Click **Consolidate** to copy them into your project structure while maintaining the bin organization.
+The extension will detect files that are used in your project but located outside your project folder. Click **Consolidate** to copy them into your project structure while maintaining the bin organization. If an identical-size copy is already present at the destination, it is reused and relinked instead of being skipped without action.
 
 ### Synchronize Structure
 

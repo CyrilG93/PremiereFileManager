@@ -138,6 +138,9 @@ For issues, questions, or feature requests, please send me a message on Discord.
 
 ## Changelog
 
+### v1.5.13 - 2026-09-16
+- Consolidate now relinks an existing destination copy when it matches the original file size, instead of leaving it skipped.
+
 ### v1.5.12 - 2026-09-16
 - Kept Structure synchronization out of compact mode, which remains dedicated to quick import and consolidation.
 

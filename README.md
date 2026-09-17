@@ -140,11 +140,6 @@ For issues, questions, or feature requests, please send me a message on Discord.
 
 ### v1.5.13 - 2026-09-16
 - Consolidate now relinks an existing destination copy when it matches the original file size, instead of leaving it skipped.
-
-### v1.5.12 - 2026-09-16
-- Kept Structure synchronization out of compact mode, which remains dedicated to quick import and consolidation.
-
-### v1.5.11 - 2026-09-16
 - Added the Structure tab to compare Premiere bins with folders on disk and synchronize selected differences in either direction.
 - Structure synchronization moves files instantly when both locations are on the same volume, while keeping a safe copy fallback for different volumes.
 - Added translated Structure controls and improved protection against auto-import duplicates during synchronization.

@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.15';
+let CURRENT_VERSION = '1.5.16';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -217,7 +217,7 @@ const baseTranslations = {
         deselectAllImport: "None",
         selectAllExport: "All",
         deselectAllExport: "None",
-        addFolderLabelRule: "Add rule",
+        addFolderLabelRule: "Add label rules",
         removeFolderLabelRule: "Remove rule",
         addFolderBinRule: "Add bin rule",
         removeFolderBinRule: "Remove bin rule"
@@ -310,7 +310,14 @@ const translations = {
             excludedFolderNames: "Beim Import zu ignorierende Ordnernamen",
             excludedFolderNamesPlaceholder: "Bsp: node_modules, .git, Thumbs.db",
             bannedExtensions: "Vom Import ausgeschlossene Dateiendungen",
-            bannedExtensionsPlaceholder: "Bsp: .zip, .pptx, .exe\nEine Endung pro Zeile"
+            bannedExtensionsPlaceholder: "Bsp: .zip, .pptx, .exe\nEine Endung pro Zeile",
+            folderLabelRules: "Premiere-Labels nach Quellordner",
+            folderLabelRulesHelp: "Wendet ein Label auf Medien aus einem Ordner mit diesem Namen an. Bei mehreren Treffern hat der nächste Ordner zur Datei Vorrang.",
+            folderLabelNamePlaceholder: "Ordnername (z. B. MUSIK)",
+            folderBinRules: "Premiere-Ablagen nach Quellordner",
+            folderBinRulesHelp: "Importiert Dateien aus einem Quellordner in die angegebene Ablage. Der nächste Quellordner hat Vorrang; / für eine Unterablage verwenden.",
+            folderBinSourcePlaceholder: "Quellordner (z. B. Medien und Audio)",
+            folderBinTargetPlaceholder: "Premiere-Ablage (z. B. Medien/Audio)"
         },
         buttons: {
             analyze: "Analysieren",
@@ -322,7 +329,11 @@ const translations = {
             selectAllImport: "Alle",
             deselectAllImport: "Keine",
             selectAllExport: "Alle",
-            deselectAllExport: "Keine"
+            deselectAllExport: "Keine",
+            addFolderLabelRule: "Label-Regel hinzufügen",
+            removeFolderLabelRule: "Label-Regel entfernen",
+            addFolderBinRule: "Ablage-Regel hinzufügen",
+            removeFolderBinRule: "Ablage-Regel entfernen"
         },
         compact: {
             import: "Importieren",
@@ -409,7 +420,14 @@ const translations = {
             excludedFolderNames: "Nombres de carpetas a ignorar en importación",
             excludedFolderNamesPlaceholder: "Ej: node_modules, .git, Thumbs.db",
             bannedExtensions: "Extensiones de archivo prohibidas para importar",
-            bannedExtensionsPlaceholder: "Ej: .zip, .pptx, .exe\nUna extensión por línea"
+            bannedExtensionsPlaceholder: "Ej: .zip, .pptx, .exe\nUna extensión por línea",
+            folderLabelRules: "Etiquetas de Premiere por carpeta de origen",
+            folderLabelRulesHelp: "Aplica una etiqueta a los medios de una carpeta con este nombre. Si coinciden varias carpetas, tiene prioridad la más cercana al archivo.",
+            folderLabelNamePlaceholder: "Nombre de carpeta (p. ej., MÚSICA)",
+            folderBinRules: "Contenedores de Premiere por carpeta de origen",
+            folderBinRulesHelp: "Importa archivos de una carpeta de origen al contenedor indicado. Gana la carpeta de origen más cercana; usa / para un subcontenedor.",
+            folderBinSourcePlaceholder: "Carpeta de origen (p. ej., Medios y audio)",
+            folderBinTargetPlaceholder: "Contenedor de Premiere (p. ej., Medios/Audio)"
         },
         buttons: {
             analyze: "Analizar",
@@ -421,7 +439,11 @@ const translations = {
             selectAllImport: "Todo",
             deselectAllImport: "Ninguno",
             selectAllExport: "Todo",
-            deselectAllExport: "Ninguno"
+            deselectAllExport: "Ninguno",
+            addFolderLabelRule: "Añadir regla de etiqueta",
+            removeFolderLabelRule: "Eliminar regla de etiqueta",
+            addFolderBinRule: "Añadir regla de contenedor",
+            removeFolderBinRule: "Eliminar regla de contenedor"
         },
         compact: {
             import: "Importar",
@@ -528,7 +550,7 @@ const translations = {
             deselectAllImport: "Aucun",
             selectAllExport: "Tout",
             deselectAllExport: "Aucun",
-            addFolderLabelRule: "Ajouter une règle",
+            addFolderLabelRule: "Ajouter une règle de label",
             removeFolderLabelRule: "Supprimer la règle",
             addFolderBinRule: "Ajouter une règle de chutier",
             removeFolderBinRule: "Supprimer la règle de chutier"
@@ -618,7 +640,14 @@ const translations = {
             excludedFolderNames: "Nomi cartelle da ignorare in importazione",
             excludedFolderNamesPlaceholder: "Es: node_modules, .git, Thumbs.db",
             bannedExtensions: "Estensioni file vietate in importazione",
-            bannedExtensionsPlaceholder: "Es: .zip, .pptx, .exe\nUna estensione per riga"
+            bannedExtensionsPlaceholder: "Es: .zip, .pptx, .exe\nUna estensione per riga",
+            folderLabelRules: "Etichette Premiere per cartella sorgente",
+            folderLabelRulesHelp: "Applica un'etichetta ai media da una cartella con questo nome. Quando più cartelle corrispondono, prevale quella più vicina al file.",
+            folderLabelNamePlaceholder: "Nome cartella (es. MUSICA)",
+            folderBinRules: "Bin Premiere per cartella sorgente",
+            folderBinRulesHelp: "Importa i file da una cartella sorgente nel bin indicato. Prevale la cartella sorgente più vicina; usa / per un sotto-bin.",
+            folderBinSourcePlaceholder: "Cartella sorgente (es. Media e audio)",
+            folderBinTargetPlaceholder: "Bin Premiere (es. Media/Audio)"
         },
         buttons: {
             analyze: "Analizza",
@@ -630,7 +659,11 @@ const translations = {
             selectAllImport: "Tutto",
             deselectAllImport: "Nessuno",
             selectAllExport: "Tutto",
-            deselectAllExport: "Nessuno"
+            deselectAllExport: "Nessuno",
+            addFolderLabelRule: "Aggiungi regola etichetta",
+            removeFolderLabelRule: "Rimuovi regola etichetta",
+            addFolderBinRule: "Aggiungi regola bin",
+            removeFolderBinRule: "Rimuovi regola bin"
         },
         compact: {
             import: "Importa",
@@ -717,7 +750,14 @@ const translations = {
             excludedFolderNames: "Nomes de pastas para ignorar na importação",
             excludedFolderNamesPlaceholder: "Ex: node_modules, .git, Thumbs.db",
             bannedExtensions: "Extensões de arquivo proibidas na importação",
-            bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nUma extensão por linha"
+            bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nUma extensão por linha",
+            folderLabelRules: "Rótulos do Premiere por pasta de origem",
+            folderLabelRulesHelp: "Aplica um rótulo à mídia de uma pasta com este nome. Quando várias pastas correspondem, a mais próxima do arquivo prevalece.",
+            folderLabelNamePlaceholder: "Nome da pasta (ex.: MÚSICA)",
+            folderBinRules: "Bins do Premiere por pasta de origem",
+            folderBinRulesHelp: "Importa arquivos de uma pasta de origem para o bin indicado. A pasta de origem mais próxima prevalece; use / para um sub-bin.",
+            folderBinSourcePlaceholder: "Pasta de origem (ex.: Mídia e áudio)",
+            folderBinTargetPlaceholder: "Bin do Premiere (ex.: Mídia/Áudio)"
         },
         buttons: {
             analyze: "Analisar",
@@ -729,7 +769,11 @@ const translations = {
             selectAllImport: "Tudo",
             deselectAllImport: "Nenhum",
             selectAllExport: "Tudo",
-            deselectAllExport: "Nenhum"
+            deselectAllExport: "Nenhum",
+            addFolderLabelRule: "Adicionar regra de rótulo",
+            removeFolderLabelRule: "Remover regra de rótulo",
+            addFolderBinRule: "Adicionar regra de bin",
+            removeFolderBinRule: "Remover regra de bin"
         },
         compact: {
             import: "Importar",
@@ -816,7 +860,14 @@ const translations = {
             excludedFolderNames: "Имена папок, игнорируемые при импорте",
             excludedFolderNamesPlaceholder: "Пример: node_modules, .git, Thumbs.db",
             bannedExtensions: "Расширения файлов, запрещённые для импорта",
-            bannedExtensionsPlaceholder: "Пример: .zip, .pptx, .exe\nОдно расширение на строку"
+            bannedExtensionsPlaceholder: "Пример: .zip, .pptx, .exe\nОдно расширение на строку",
+            folderLabelRules: "Метки Premiere по исходной папке",
+            folderLabelRulesHelp: "Применяет метку к медиа из папки с этим именем. Если совпадает несколько папок, приоритет у ближайшей к файлу.",
+            folderLabelNamePlaceholder: "Имя папки (например, МУЗЫКА)",
+            folderBinRules: "Бины Premiere по исходной папке",
+            folderBinRulesHelp: "Импортирует файлы из исходной папки в указанный бин. Приоритет у ближайшей исходной папки; используйте / для вложенного бина.",
+            folderBinSourcePlaceholder: "Исходная папка (например, Медиа и аудио)",
+            folderBinTargetPlaceholder: "Бин Premiere (например, Медиа/Аудио)"
         },
         buttons: {
             analyze: "Анализ",
@@ -828,7 +879,11 @@ const translations = {
             selectAllImport: "Все",
             deselectAllImport: "Ничего",
             selectAllExport: "Все",
-            deselectAllExport: "Ничего"
+            deselectAllExport: "Ничего",
+            addFolderLabelRule: "Добавить правило метки",
+            removeFolderLabelRule: "Удалить правило метки",
+            addFolderBinRule: "Добавить правило бина",
+            removeFolderBinRule: "Удалить правило бина"
         },
         compact: {
             import: "Импорт",
@@ -915,7 +970,14 @@ const translations = {
             excludedFolderNames: "インポート時に無視するフォルダー名",
             excludedFolderNamesPlaceholder: "例: node_modules, .git, Thumbs.db",
             bannedExtensions: "インポート禁止の拡張子",
-            bannedExtensionsPlaceholder: "例: .zip, .pptx, .exe\n1行に1拡張子"
+            bannedExtensionsPlaceholder: "例: .zip, .pptx, .exe\n1行に1拡張子",
+            folderLabelRules: "ソースフォルダー別 Premiere ラベル",
+            folderLabelRulesHelp: "この名前のフォルダーからのメディアにラベルを適用します。複数一致した場合は、ファイルに最も近いフォルダーが優先されます。",
+            folderLabelNamePlaceholder: "フォルダー名 (例: MUSIC)",
+            folderBinRules: "ソースフォルダー別 Premiere ビン",
+            folderBinRulesHelp: "ソースフォルダーのファイルを指定のビンに読み込みます。最も近いソースフォルダーが優先されます。サブビンには / を使用します。",
+            folderBinSourcePlaceholder: "ソースフォルダー (例: メディアとオーディオ)",
+            folderBinTargetPlaceholder: "Premiere ビン (例: メディア/オーディオ)"
         },
         buttons: {
             analyze: "解析",
@@ -927,7 +989,11 @@ const translations = {
             selectAllImport: "全て",
             deselectAllImport: "なし",
             selectAllExport: "全て",
-            deselectAllExport: "なし"
+            deselectAllExport: "なし",
+            addFolderLabelRule: "ラベルルールを追加",
+            removeFolderLabelRule: "ラベルルールを削除",
+            addFolderBinRule: "ビンルールを追加",
+            removeFolderBinRule: "ビンルールを削除"
         },
         compact: {
             import: "インポート",
@@ -1014,7 +1080,14 @@ const translations = {
             excludedFolderNames: "导入时忽略的文件夹名称",
             excludedFolderNamesPlaceholder: "例如: node_modules, .git, Thumbs.db",
             bannedExtensions: "禁止导入的文件扩展名",
-            bannedExtensionsPlaceholder: "例如: .zip, .pptx, .exe\n每行一个扩展名"
+            bannedExtensionsPlaceholder: "例如: .zip, .pptx, .exe\n每行一个扩展名",
+            folderLabelRules: "按源文件夹设置 Premiere 标签",
+            folderLabelRulesHelp: "为来自此名称文件夹的媒体应用标签。若匹配多个文件夹，最接近文件的文件夹优先。",
+            folderLabelNamePlaceholder: "文件夹名称（例如：音乐）",
+            folderBinRules: "按源文件夹设置 Premiere 素材箱",
+            folderBinRulesHelp: "将源文件夹中的文件导入指定素材箱。最接近的源文件夹优先；使用 / 指定子素材箱。",
+            folderBinSourcePlaceholder: "源文件夹（例如：媒体和音频）",
+            folderBinTargetPlaceholder: "Premiere 素材箱（例如：媒体/音频）"
         },
         buttons: {
             analyze: "分析",
@@ -1026,7 +1099,11 @@ const translations = {
             selectAllImport: "全部",
             deselectAllImport: "无",
             selectAllExport: "全部",
-            deselectAllExport: "无"
+            deselectAllExport: "无",
+            addFolderLabelRule: "添加标签规则",
+            removeFolderLabelRule: "删除标签规则",
+            addFolderBinRule: "添加素材箱规则",
+            removeFolderBinRule: "删除素材箱规则"
         },
         compact: {
             import: "导入",

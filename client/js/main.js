@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.14';
+let CURRENT_VERSION = '1.5.15';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -200,7 +200,11 @@ const baseTranslations = {
         bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nOne extension per line",
         folderLabelRules: "Premiere labels by source folder",
         folderLabelRulesHelp: "Apply a label to media from a folder with this name. When several folders match, the closest folder to the file wins.",
-        folderLabelNamePlaceholder: "Folder name (e.g. MUSIC)"
+        folderLabelNamePlaceholder: "Folder name (e.g. MUSIC)",
+        folderBinRules: "Premiere bins by source folder",
+        folderBinRulesHelp: "Import files from a source folder into the specified bin. The closest source folder wins; use / for a nested bin.",
+        folderBinSourcePlaceholder: "Source folder (e.g. Media and audio)",
+        folderBinTargetPlaceholder: "Premiere bin (e.g. Media/Audio)"
     },
     buttons: {
         analyze: "Analyze",
@@ -214,7 +218,9 @@ const baseTranslations = {
         selectAllExport: "All",
         deselectAllExport: "None",
         addFolderLabelRule: "Add rule",
-        removeFolderLabelRule: "Remove rule"
+        removeFolderLabelRule: "Remove rule",
+        addFolderBinRule: "Add bin rule",
+        removeFolderBinRule: "Remove bin rule"
     },
     compact: {
         import: "Import",
@@ -505,7 +511,11 @@ const translations = {
             bannedExtensionsPlaceholder: "Ex: .zip, .pptx, .exe\nUne extension par ligne",
             folderLabelRules: "Labels Premiere par dossier source",
             folderLabelRulesHelp: "Applique un label aux médias venant d'un dossier portant ce nom. Si plusieurs dossiers correspondent, le plus proche du fichier est utilisé.",
-            folderLabelNamePlaceholder: "Nom du dossier (ex. MUSIQUE)"
+            folderLabelNamePlaceholder: "Nom du dossier (ex. MUSIQUE)",
+            folderBinRules: "Chutiers Premiere par dossier source",
+            folderBinRulesHelp: "Importe les fichiers d’un dossier dans le chutier indiqué. Le dossier source le plus proche est prioritaire ; utilisez / pour un sous-chutier.",
+            folderBinSourcePlaceholder: "Dossier source (ex. Medias et audio)",
+            folderBinTargetPlaceholder: "Chutier Premiere (ex. Medias/Audio)"
         },
         buttons: {
             analyze: "Analyser",
@@ -519,7 +529,9 @@ const translations = {
             selectAllExport: "Tout",
             deselectAllExport: "Aucun",
             addFolderLabelRule: "Ajouter une règle",
-            removeFolderLabelRule: "Supprimer la règle"
+            removeFolderLabelRule: "Supprimer la règle",
+            addFolderBinRule: "Ajouter une règle de chutier",
+            removeFolderBinRule: "Supprimer la règle de chutier"
         },
         compact: {
             import: "Importer",
@@ -1146,9 +1158,13 @@ function changeLanguage(lang) {
         if (document.getElementById('folderLabelRules')) {
             settings.folderLabelRules = fm_readFolderLabelRulesFromUI();
         }
+        if (document.getElementById('folderBinRules')) {
+            settings.folderBinRules = fm_readFolderBinRulesFromUI();
+        }
         currentLang = lang;
         updateUILanguage();
         fm_renderFolderLabelRules();
+        fm_renderFolderBinRules();
         // Rebuild current structure rows so their direction labels follow the selected language too.
         if (!document.getElementById('structureResults').hidden) {
             fm_renderStructureResults();
@@ -1223,6 +1239,7 @@ let settings = {
     excludedFolders: [],
     excludedFolderNames: ['Premiere Pro Auto-Save', 'Adobe Premiere Pro Auto-Save'],
     folderLabelRules: [], // Map source folder names to Premiere's fixed label indexes
+    folderBinRules: [], // Map source folder names to their preferred Premiere bin paths
     bannedExtensions: FM_DEFAULT_BANNED_EXTENSIONS.slice(),
     autoImport: false,
     autoImportInterval: 30,
@@ -1311,6 +1328,7 @@ function fm_prepareFilesForImport(files) {
     return (files || []).map((file) => {
         const preparedFile = Object.assign({}, file);
         const labelColor = fm_getFolderLabelColorForFile(file);
+        const targetBinPath = fm_getFolderBinPathForFile(file);
 
         if (labelColor === null) {
             delete preparedFile.labelColor;
@@ -1318,8 +1336,108 @@ function fm_prepareFilesForImport(files) {
             preparedFile.labelColor = labelColor;
         }
 
+        if (targetBinPath !== null) {
+            preparedFile.binPath = targetBinPath;
+        }
+
         return preparedFile;
     });
+}
+
+// Normalize persisted mappings and retain the last rule for each source folder name.
+function fm_normalizeFolderBinRules(rawRules) {
+    const rulesByFolderName = Object.create(null);
+    if (!Array.isArray(rawRules)) {
+        return [];
+    }
+
+    rawRules.forEach((rule) => {
+        const folderName = String((rule && rule.folderName) || '').trim();
+        const binPath = String((rule && rule.binPath) || '').trim().replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+        const folderKey = folderName.toLowerCase();
+
+        if (!folderName || /[\\/]/.test(folderName) || !binPath || binPath.split('/').some((segment) => !segment.trim())) {
+            return;
+        }
+
+        rulesByFolderName[folderKey] = { folderName: folderName, binPath: binPath };
+    });
+
+    return Object.keys(rulesByFolderName).map((folderKey) => rulesByFolderName[folderKey]);
+}
+
+// Return the preferred Premiere bin for the deepest matching source folder, if one is configured.
+function fm_getFolderBinPathForFile(file) {
+    const rules = fm_normalizeFolderBinRules(settings.folderBinRules);
+    const rulesByFolderName = Object.create(null);
+    const folderPath = String((file && file.sourceFolderPath) || '').replace(/\\/g, '/');
+    const folderSegments = folderPath.split('/').filter(Boolean);
+
+    rules.forEach((rule) => {
+        rulesByFolderName[rule.folderName.toLowerCase()] = rule.binPath;
+    });
+
+    for (let segmentIndex = folderSegments.length - 1; segmentIndex >= 0; segmentIndex--) {
+        const matchingBinPath = rulesByFolderName[folderSegments[segmentIndex].toLowerCase()];
+        if (matchingBinPath !== undefined) {
+            return matchingBinPath;
+        }
+    }
+
+    return null;
+}
+
+// Render editable source-folder-to-Premiere-bin mappings in the settings panel.
+function fm_renderFolderBinRules() {
+    const rulesContainer = document.getElementById('folderBinRules');
+    if (!rulesContainer) {
+        return;
+    }
+
+    rulesContainer.innerHTML = '';
+    settings.folderBinRules.forEach((rule, ruleIndex) => {
+        const row = document.createElement('div');
+        const folderInput = document.createElement('input');
+        const binInput = document.createElement('input');
+        const removeButton = document.createElement('button');
+
+        row.className = 'folder-bin-rule';
+        folderInput.type = 'text';
+        folderInput.className = 'folder-bin-source';
+        folderInput.value = rule.folderName;
+        folderInput.placeholder = t('settings.folderBinSourcePlaceholder');
+        folderInput.setAttribute('aria-label', t('settings.folderBinSourcePlaceholder'));
+        binInput.type = 'text';
+        binInput.className = 'folder-bin-target';
+        binInput.value = rule.binPath;
+        binInput.placeholder = t('settings.folderBinTargetPlaceholder');
+        binInput.setAttribute('aria-label', t('settings.folderBinTargetPlaceholder'));
+        removeButton.type = 'button';
+        removeButton.className = 'remove-folder-label-rule-btn';
+        removeButton.textContent = '×';
+        removeButton.title = t('buttons.removeFolderBinRule');
+        removeButton.setAttribute('aria-label', t('buttons.removeFolderBinRule'));
+        removeButton.addEventListener('click', () => {
+            const currentRules = fm_readFolderBinRulesFromUI();
+            currentRules.splice(ruleIndex, 1);
+            settings.folderBinRules = currentRules;
+            fm_renderFolderBinRules();
+        });
+        row.appendChild(folderInput);
+        row.appendChild(binInput);
+        row.appendChild(removeButton);
+        rulesContainer.appendChild(row);
+    });
+}
+
+// Read mappings from the settings panel and reject incomplete or unsafe values before persisting them.
+function fm_readFolderBinRulesFromUI() {
+    const ruleRows = document.querySelectorAll('#folderBinRules .folder-bin-rule');
+    const rawRules = Array.from(ruleRows).map((row) => ({
+        folderName: row.querySelector('.folder-bin-source').value,
+        binPath: row.querySelector('.folder-bin-target').value
+    }));
+    return fm_normalizeFolderBinRules(rawRules);
 }
 
 // Replace fallback definitions with Premiere's active label preferences when they are available.
@@ -1715,7 +1833,8 @@ function loadSettings() {
             bannedExtensions: mergedBannedExtensions,
             excludedFolderNames: loadedSettings.excludedFolderNames || settings.excludedFolderNames,
             excludedFolders: loadedSettings.excludedFolders || settings.excludedFolders,
-            folderLabelRules: fm_normalizeFolderLabelRules(loadedSettings.folderLabelRules)
+            folderLabelRules: fm_normalizeFolderLabelRules(loadedSettings.folderLabelRules),
+            folderBinRules: fm_normalizeFolderBinRules(loadedSettings.folderBinRules)
         };
 
         // Load language if saved
@@ -1756,6 +1875,7 @@ function loadSettings() {
     document.getElementById('bannedExtensions').value = (settings.bannedExtensions || []).sort().join('\n');
     // Render saved label rules immediately, then refresh names and colors from Premiere asynchronously.
     fm_renderFolderLabelRules();
+    fm_renderFolderBinRules();
     fm_refreshPremiereLabelDefinitions();
     document.getElementById('autoImport').checked = settings.autoImport || false;
     document.getElementById('autoImportInterval').value = settings.autoImportInterval || 30;
@@ -1799,6 +1919,7 @@ function saveSettings() {
 
     // Persist only valid folder-name-to-label mappings from the settings editor.
     settings.folderLabelRules = fm_readFolderLabelRulesFromUI();
+    settings.folderBinRules = fm_readFolderBinRulesFromUI();
 
     // Parse banned extensions
     const bannedExtensionsText = document.getElementById('bannedExtensions').value;
@@ -3828,6 +3949,16 @@ document.addEventListener('DOMContentLoaded', () => {
         settings.folderLabelRules.push({ folderName: '', labelColor: 0 });
         fm_renderFolderLabelRules();
         const inputs = document.querySelectorAll('#folderLabelRules .folder-label-name');
+        if (inputs.length) {
+            inputs[inputs.length - 1].focus();
+        }
+    });
+    document.getElementById('addFolderBinRuleBtn').addEventListener('click', () => {
+        // Preserve in-progress edits before adding a new source-folder-to-bin mapping.
+        settings.folderBinRules = fm_readFolderBinRulesFromUI();
+        settings.folderBinRules.push({ folderName: '', binPath: '' });
+        fm_renderFolderBinRules();
+        const inputs = document.querySelectorAll('#folderBinRules .folder-bin-source');
         if (inputs.length) {
             inputs[inputs.length - 1].focus();
         }

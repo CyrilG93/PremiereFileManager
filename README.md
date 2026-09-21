@@ -92,6 +92,7 @@ The **Import** and **Consolidate** commands use the same one-click behavior as c
 ## Settings
 
 - **Language**: Quick language selector in header + full selector in settings
+- **Premiere bins by source folder**: Route a local folder into a chosen Premiere bin during manual, compact, or automatic import. For example, `Medias et audio` can import into `Medias`; use `/` to target a sub-bin.
 - **Host Log Level**: Control ExtendScript host verbosity (`debug`, `info`, `warn`, `error`)
 - **Root Folder**: Set the base folder for your project (auto-detected by default)
 - **Root Folder Levels**: Number of parent folders to go up from the .prproj file

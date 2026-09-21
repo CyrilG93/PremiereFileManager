@@ -1256,9 +1256,23 @@ button svg {
     gap: 8px;
 }
 
+/* Keep source-folder-to-bin rules aligned with the existing source-folder label rules. */
+.folder-bin-rules {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
 .folder-label-rule {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(110px, 0.8fr) auto;
+    align-items: center;
+    gap: 8px;
+}
+
+.folder-bin-rule {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     align-items: center;
     gap: 8px;
 }
@@ -1274,8 +1288,24 @@ button svg {
     font: inherit;
 }
 
+.folder-bin-rule input {
+    min-width: 0;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text-primary);
+    font: inherit;
+}
+
 .folder-label-rule input:focus,
 .folder-label-picker-button:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);
+}
+
+.folder-bin-rule input:focus {
     outline: none;
     border-color: var(--accent-primary);
     box-shadow: 0 0 0 3px rgba(74, 158, 255, 0.1);

@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.13';
+let CURRENT_VERSION = '1.5.14';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -1977,12 +1977,13 @@ function analyzeAll() {
         }
 
         analyzeBtn.disabled = true;
-        analyzeBtn.innerHTML = '<span>Analyse en cours...</span>';
+        // Keep the temporary label in the currently selected interface language.
+        analyzeBtn.innerHTML = `<span>${t('status.analyzing')}</span>`;
 
         console.log('Calling showProgress...');
         showProgress();
         console.log('Calling updateProgress...');
-        updateProgress(0, 'Analyse en cours...');
+        updateProgress(0, t('status.analyzing'));
 
         // Use the EXACT same approach as auto-import which works
         const rootPath = settings.rootFolder || ''; // The shared host-call builder escapes paths safely for ExtendScript.
@@ -2107,11 +2108,11 @@ function analyzeAll() {
                 }
 
                 // Done - display results
-                updateProgress(100, 'Terminé');
+                updateProgress(100, t('status.completed'));
                 hideProgress();
 
                 analyzeBtn.disabled = false;
-                analyzeBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Analyser</span>';
+                analyzeBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>${t('buttons.analyze')}</span>`;
 
                 console.log('Displaying results...');
                 displayDualResults();
@@ -3488,9 +3489,10 @@ function fm_isConsolidating() {
 function analyzeForImport() {
     const importBtn = document.getElementById('importBtn');
     importBtn.disabled = true;
-    importBtn.innerHTML = '<span>Analyse en cours...</span>';
+    // Use the active locale while the legacy import-only scan is running too.
+    importBtn.innerHTML = `<span>${t('status.analyzing')}</span>`;
 
-    updateProgress(0, 'Recherche de nouveaux fichiers...');
+    updateProgress(0, t('status.searching'));
 
     const rootPath = settings.rootFolder || '';
     const levels = settings.rootFolderLevels || 0;

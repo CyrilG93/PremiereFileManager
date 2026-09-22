@@ -1,6 +1,6 @@
 # Premiere Pro File Manager
 
-A powerful Adobe Premiere Pro extension for managing project files, importing media, and consolidating your project structure.
+A powerful Adobe Premiere Pro extension for managing project files, importing medias, and consolidating your project structure.
 
 ## Features
 

@@ -2865,6 +2865,17 @@ function fm_removeMovedStructureSources(items) {
     });
 }
 
+// Windows may lock media opened by Premiere, so those rename failures can safely use the verified copy path.
+function fm_canCopyAfterNativeStructureMoveFailure(error) {
+    if (!error) {
+        return false;
+    }
+    if (error.code === 'EXDEV') {
+        return true;
+    }
+    return process.platform === 'win32' && (error.code === 'EBUSY' || error.code === 'EPERM' || error.code === 'EACCES');
+}
+
 // Move one file with a filesystem rename when source and destination share a volume.
 function fm_tryNativeStructureMove(item) {
     try {
@@ -2884,9 +2895,10 @@ function fm_tryNativeStructureMove(item) {
         debugLog(`[Structure] Native move: ${sourcePath} -> ${destinationPath}`, 'info');
         return { item, success: true, mode: 'native' };
     } catch (error) {
-        // Only a cross-device move may fall back to copying; other errors must preserve the source.
-        if (error && error.code === 'EXDEV') {
-            debugLog(`[Structure] Cross-volume move, copy fallback required: ${item.currentPath}`, 'info');
+        // A copied file is relinked and size-verified before the source is removed.
+        if (fm_canCopyAfterNativeStructureMoveFailure(error)) {
+            const reason = error.code === 'EXDEV' ? 'Cross-volume move' : `Windows locked-file move (${error.code})`;
+            debugLog(`[Structure] ${reason}, copy fallback required: ${item.currentPath}`, 'info');
             return { item, success: false, fallbackCopy: true };
         }
         debugLog(`[Structure] Native move failed: ${item.currentPath} (${error.message})`, 'warning');
@@ -2943,9 +2955,10 @@ async function fm_syncStructureToDisk() {
         let copyResults = [];
         let copiedEntries = [];
 
-        // Copy only files that cannot be renamed because the paths are on different volumes.
+        // Copy cross-volume media and Windows media that Premiere has temporarily locked.
         if (fallbackItems.length > 0) {
-            updateConsolidationProgressText('Copie entre volumes…');
+            // This fallback covers both cross-volume copies and files that Windows has temporarily locked.
+            updateConsolidationProgressText('Copie sécurisée…');
             copyResults = await copyFiles(fallbackItems.map((item) => ({
                 name: item.name,
                 source: item.currentPath,

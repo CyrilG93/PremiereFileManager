@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.16';
+let CURRENT_VERSION = '1.5.18';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2876,8 +2876,59 @@ function fm_canCopyAfterNativeStructureMoveFailure(error) {
     return process.platform === 'win32' && (error.code === 'EBUSY' || error.code === 'EPERM' || error.code === 'EACCES');
 }
 
+// Retry Win32 without Node's replace-existing flag; never copy or overwrite here.
+function fm_windowsStructureRename(sourcePath, destinationPath) {
+    // Base64 keeps quotes, shell characters and Unicode filenames out of executable code.
+    const payload = Buffer.from(JSON.stringify([sourcePath, destinationPath]), 'utf8').toString('base64');
+    const script = `
+$ErrorActionPreference = 'Stop'
+try {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class FMStructureMove {
+    // Flags zero forbids replacement and cross-volume copying.
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool MoveFileExW(string source, string destination, uint flags);
+}
+'@
+    $paths = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${payload}')) | ConvertFrom-Json
+    $ok = [FMStructureMove]::MoveFileExW($paths[0], $paths[1], 0)
+    $win32 = [Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    @{ success = $ok; win32 = $win32 } | ConvertTo-Json -Compress
+} catch { @{ success = $false; error = $_.Exception.Message } | ConvertTo-Json -Compress }
+`;
+    return new Promise((resolve, reject) => {
+        const executable = fm_path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+        require('child_process').execFile(executable, ['-NoLogo', '-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')], { windowsHide: true }, (error, stdout) => {
+            try {
+                if (error) { throw error; }
+                const result = JSON.parse(stdout.trim());
+                if (!result.success) {
+                    const failure = new Error(result.error || `Windows move failed (Win32 ${result.win32})`);
+                    failure.code = ({ 17: 'EXDEV', 32: 'EBUSY', 33: 'EBUSY', 5: 'EACCES', 80: 'EEXIST', 183: 'EEXIST' })[result.win32] || 'EIO';
+                    throw failure;
+                }
+                resolve();
+            } catch (failure) { reject(failure); }
+        });
+    });
+}
+
+// Use the same Windows fallback when restoring a move after a failed relink.
+async function fm_renameStructureFile(sourcePath, destinationPath) {
+    try {
+        fm_fs.renameSync(sourcePath, destinationPath);
+    } catch (error) {
+        if (process.platform !== 'win32' || !['EBUSY', 'EPERM', 'EACCES'].includes(error.code)) { throw error; }
+        debugLog(`[Structure] Node rename blocked (${error.code}); trying Windows move without copy`, 'info');
+        await fm_windowsStructureRename(sourcePath, destinationPath);
+        debugLog('[Structure] Windows move succeeded without copying media data', 'info');
+    }
+}
+
 // Move one file with a filesystem rename when source and destination share a volume.
-function fm_tryNativeStructureMove(item) {
+async function fm_tryNativeStructureMove(item) {
     try {
         const sourcePath = fm_path.resolve(item.currentPath);
         const destinationPath = fm_path.resolve(item.targetPath);
@@ -2891,7 +2942,7 @@ function fm_tryNativeStructureMove(item) {
             throw new Error('Destination already exists');
         }
         fm_fs.mkdirSync(fm_path.dirname(destinationPath), { recursive: true });
-        fm_fs.renameSync(sourcePath, destinationPath);
+        await fm_renameStructureFile(sourcePath, destinationPath);
         debugLog(`[Structure] Native move: ${sourcePath} -> ${destinationPath}`, 'info');
         return { item, success: true, mode: 'native' };
     } catch (error) {
@@ -2907,22 +2958,24 @@ function fm_tryNativeStructureMove(item) {
 }
 
 // Restore files moved natively when Premiere cannot relink them to their new location.
-function fm_rollbackNativeStructureMoves(entries) {
-    return (entries || []).map((entry) => {
+async function fm_rollbackNativeStructureMoves(entries) {
+    const results = [];
+    for (const entry of entries || []) {
         try {
             const sourcePath = fm_path.resolve(entry.item.currentPath);
             const destinationPath = fm_path.resolve(entry.item.targetPath);
             if (!fm_fs.existsSync(destinationPath) || fm_fs.existsSync(sourcePath)) {
                 throw new Error('Rollback paths are not safe');
             }
-            fm_fs.renameSync(destinationPath, sourcePath);
+            await fm_renameStructureFile(destinationPath, sourcePath);
             debugLog(`[Structure] Native move restored: ${destinationPath} -> ${sourcePath}`, 'warning');
-            return { name: entry.item.name, success: true };
+            results.push({ name: entry.item.name, success: true });
         } catch (error) {
             debugLog(`[Structure] Could not restore native move: ${entry.item.currentPath} (${error.message})`, 'error');
-            return { name: entry.item.name, success: false, error: error.message };
+            results.push({ name: entry.item.name, success: false, error: error.message });
         }
-    });
+    }
+    return results;
 }
 
 // Move selected files into their Premiere-bin paths, then relink the exact Premiere items.
@@ -2947,7 +3000,11 @@ async function fm_syncStructureToDisk() {
     let nativeEntriesToRestore = [];
     try {
         const startedAt = Date.now();
-        const moveAttempts = selectedItems.map(fm_tryNativeStructureMove);
+        // Complete moves sequentially before relinking Premiere.
+        const moveAttempts = [];
+        for (const item of selectedItems) {
+            moveAttempts.push(await fm_tryNativeStructureMove(item));
+        }
         const nativeEntries = moveAttempts.filter((entry) => entry.success);
         nativeEntriesToRestore = nativeEntries;
         const fallbackItems = moveAttempts.filter((entry) => entry.fallbackCopy).map((entry) => entry.item);
@@ -2991,7 +3048,7 @@ async function fm_syncStructureToDisk() {
             const removalResults = fm_removeMovedStructureSources(relinkedCopiedItems);
             const removedCopiedCount = removalResults.filter((entry) => entry.success).length;
             const relinkedNativeCount = relinkedEntries.filter((entry) => entry.mode === 'native').length;
-            fm_rollbackNativeStructureMoves(unrelinkedNativeEntries);
+            await fm_rollbackNativeStructureMoves(unrelinkedNativeEntries);
             nativeEntriesToRestore = [];
             movedCount = relinkedNativeCount + removedCopiedCount;
             retainedCount = relinkedCopiedItems.length - removedCopiedCount + unrelinkedCopiedCount;
@@ -3006,7 +3063,7 @@ async function fm_syncStructureToDisk() {
     } catch (error) {
         // If the relink request itself fails, put native moves back before reporting the error.
         if (nativeEntriesToRestore.length > 0) {
-            fm_rollbackNativeStructureMoves(nativeEntriesToRestore);
+            await fm_rollbackNativeStructureMoves(nativeEntriesToRestore);
         }
         console.error('Structure disk sync error:', error);
         showStatus(`Erreur de synchronisation vers le disque : ${error.message}`, 'error');

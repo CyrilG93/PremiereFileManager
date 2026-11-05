@@ -2475,7 +2475,53 @@ function FileManager_moveItemsToDiskFolders(itemsJson) {
     }
 }
 
-// Relink copied structure-sync media by their project-item ids to avoid changing duplicate clips.
+// Snapshot every online reference before releasing a file, including duplicates in other bins.
+function FileManager_getStructureReferences(itemJson) {
+    try {
+        var item = JSON.parse(itemJson);
+        var wantedPath = normalizeComparablePath(item.currentPath);
+        var references = [];
+        var pending = [app.project.rootItem];
+        while (pending.length) {
+            var parent = pending.pop();
+            if (!parent.children) { continue; }
+            for (var i = 0; i < parent.children.numItems; i++) {
+                var child = parent.children[i];
+                if (!child) { continue; }
+                pending.push(child);
+                if (child.type === 2) { continue; }
+                // Moving a proxy needs a separate proxy relink workflow; do not detach it accidentally.
+                if (child.hasProxy && child.hasProxy() && normalizeComparablePath(child.getProxyPath()) === wantedPath) {
+                    throw new Error('This file is also used as a proxy; automatic release is unavailable');
+                }
+                if (!child.getMediaPath || normalizeComparablePath(child.getMediaPath()) !== wantedPath || child.isOffline()) { continue; }
+                if (!child.canChangeMediaPath() || !child.setOffline) {
+                    throw new Error('A media reference cannot be temporarily released');
+                }
+                references.push({ nodeId: String(child.nodeId), currentPath: item.currentPath, binPath: getBinPath(child), name: child.name });
+            }
+        }
+        if (!references.length) { throw new Error('No online media references found'); }
+        return JSON.stringify({ references: references });
+    } catch (e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// Release references only after the panel has received their snapshot for recovery.
+function FileManager_setStructureReferencesOffline(itemsJson) {
+    try {
+        var items = JSON.parse(itemsJson);
+        for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var projectItem = FileManager_findStructureItem(app.project.rootItem, item.nodeId, item.currentPath, item.binPath);
+            if (!projectItem) { throw new Error('Media reference not found: ' + item.name); }
+            if (!projectItem.isOffline()) { projectItem.setOffline(); }
+            if (!projectItem.isOffline()) { throw new Error('Premiere did not release: ' + item.name); }
+        }
+        return JSON.stringify({ success: true });
+    } catch (e) { return JSON.stringify({ error: e.toString() }); }
+}
+
+// Relink structure-sync media by project-item id, then verify the resulting path and online state.
 function FileManager_relinkStructureItems(itemsJson) {
     try {
         var items = JSON.parse(itemsJson);
@@ -2491,6 +2537,9 @@ function FileManager_relinkStructureItems(itemsJson) {
             try {
                 // Some Premiere releases return undefined here despite changing the media path successfully.
                 projectItem.changeMediaPath(relinkPath, true);
+                if (projectItem.isOffline() || normalizeComparablePath(projectItem.getMediaPath()) !== normalizeComparablePath(relinkPath)) {
+                    throw new Error('Premiere did not confirm the new media path');
+                }
                 results.push({ name: item.name, success: true });
             } catch (relinkError) {
                 results.push({ name: item.name, success: false, error: relinkError.toString() });

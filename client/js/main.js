@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.18';
+let CURRENT_VERSION = '1.5.19';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2865,15 +2865,12 @@ function fm_removeMovedStructureSources(items) {
     });
 }
 
-// Windows may lock media opened by Premiere, so those rename failures can safely use the verified copy path.
+// Only a move across volumes needs to copy data; locked files must first release Premiere's references.
 function fm_canCopyAfterNativeStructureMoveFailure(error) {
     if (!error) {
         return false;
     }
-    if (error.code === 'EXDEV') {
-        return true;
-    }
-    return process.platform === 'win32' && (error.code === 'EBUSY' || error.code === 'EPERM' || error.code === 'EACCES');
+    return error.code === 'EXDEV';
 }
 
 // Retry Win32 without Node's replace-existing flag; never copy or overwrite here.
@@ -2946,15 +2943,92 @@ async function fm_tryNativeStructureMove(item) {
         debugLog(`[Structure] Native move: ${sourcePath} -> ${destinationPath}`, 'info');
         return { item, success: true, mode: 'native' };
     } catch (error) {
+        if (process.platform === 'win32' && ['EBUSY', 'EPERM', 'EACCES'].includes(error.code)) {
+            debugLog(`[Structure] File locked; temporary Premiere release required: ${item.currentPath}`, 'info');
+            return { item, success: false, requiresRelease: true };
+        }
         // A copied file is relinked and size-verified before the source is removed.
         if (fm_canCopyAfterNativeStructureMoveFailure(error)) {
-            const reason = error.code === 'EXDEV' ? 'Cross-volume move' : `Windows locked-file move (${error.code})`;
-            debugLog(`[Structure] ${reason}, copy fallback required: ${item.currentPath}`, 'info');
+            debugLog(`[Structure] Cross-volume move, copy fallback required: ${item.currentPath}`, 'info');
             return { item, success: false, fallbackCopy: true };
         }
         debugLog(`[Structure] Native move failed: ${item.currentPath} (${error.message})`, 'warning');
         return { item, success: false, error: error.message };
     }
+}
+
+// Verify host replies so a silent relink failure cannot be reported as a completed move.
+async function fm_structureHostRequest(name, items) {
+    const result = JSON.parse(await fm_evalScriptPromise(fm_buildHostCall(name, [JSON.stringify(items)])));
+    if (result.error) { throw new Error(result.error); }
+    if (name === 'FileManager_relinkStructureItems' && (!Array.isArray(result.results) || result.results.length !== items.length)) {
+        throw new Error('Incomplete media relink response');
+    }
+    if (name === 'FileManager_setStructureReferencesOffline' && result.success !== true) { throw new Error('Media release not confirmed'); }
+    if (result.results && result.results.some((entry) => !entry.success)) {
+        throw new Error(result.results.filter((entry) => !entry.success).map((entry) => entry.error).join('; '));
+    }
+    return result;
+}
+
+// Detach all online references, allow a short handle-release delay, move, then reconnect the same items.
+async function fm_moveReleasedStructureItem(item) {
+    let references = [];
+    let moved = false;
+    let linked = false;
+    let failure = null;
+    try {
+        // Snapshot first: even a partially failed offline request can then be recovered.
+        const snapshot = await fm_structureHostRequest('FileManager_getStructureReferences', item);
+        references = Array.isArray(snapshot.references) ? snapshot.references : [];
+        if (!references.length) { throw new Error('Missing media references'); }
+        debugLog(`[Structure] Temporarily releasing ${references.length} Premiere reference(s)`, 'info');
+        await fm_structureHostRequest('FileManager_setStructureReferencesOffline', references);
+        let lastError;
+        for (const delay of [100, 200, 400, 800]) {
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            try {
+                // Recheck destination on every attempt; an unrelated file must never be replaced.
+                if (fm_fs.existsSync(item.targetPath)) { throw new Error('Destination already exists'); }
+                fm_fs.renameSync(item.currentPath, item.targetPath);
+                moved = true;
+                break;
+            } catch (error) {
+                lastError = error;
+                if (!['EBUSY', 'EPERM', 'EACCES'].includes(error.code)) { throw error; }
+            }
+        }
+        if (!moved) { throw lastError; }
+        await fm_structureHostRequest('FileManager_relinkStructureItems', references.map((ref) => ({ ...ref, targetPath: item.targetPath })));
+        linked = true;
+        debugLog(`[Structure] Released, moved without copy, and relinked: ${item.targetPath}`, 'info');
+        return { item, success: true, mode: 'released' };
+    } catch (error) {
+        failure = error;
+        // A partially successful relink can hold the destination open; release it again before rollback.
+        if (moved) {
+            try {
+                await fm_structureHostRequest('FileManager_setStructureReferencesOffline', references);
+                const rollback = await fm_rollbackNativeStructureMoves([{ item }]);
+                if (!rollback[0].success) { throw new Error(rollback[0].error); }
+                moved = false;
+            } catch (rollbackError) {
+                debugLog(`[Structure] File remains at ${item.targetPath}: ${rollbackError.message}`, 'error');
+            }
+        }
+    } finally {
+        if (!linked && references.length) {
+            const recoveryPath = moved ? item.targetPath : item.currentPath;
+            try {
+                await fm_structureHostRequest('FileManager_relinkStructureItems', references.map((ref) => ({ ...ref, targetPath: recoveryPath })));
+                debugLog(`[Structure] Media references restored: ${recoveryPath}`, 'info');
+            } catch (restoreError) {
+                debugLog(`[Structure] Manual relink required at ${recoveryPath}: ${restoreError.message}`, 'error');
+            }
+        }
+    }
+    debugLog(`[Structure] Move cancelled without copying: ${failure.message}`, 'warning');
+    return { item, success: false, error: failure.message };
 }
 
 // Restore files moved natively when Premiere cannot relink them to their new location.
@@ -3003,18 +3077,21 @@ async function fm_syncStructureToDisk() {
         // Complete moves sequentially before relinking Premiere.
         const moveAttempts = [];
         for (const item of selectedItems) {
-            moveAttempts.push(await fm_tryNativeStructureMove(item));
+            const attempt = await fm_tryNativeStructureMove(item);
+            moveAttempts.push(attempt.requiresRelease ? await fm_moveReleasedStructureItem(item) : attempt);
         }
-        const nativeEntries = moveAttempts.filter((entry) => entry.success);
+        const releasedCount = moveAttempts.filter((entry) => entry.success && entry.mode === 'released').length;
+        movedCount = releasedCount;
+        const nativeEntries = moveAttempts.filter((entry) => entry.success && entry.mode === 'native');
         nativeEntriesToRestore = nativeEntries;
         const fallbackItems = moveAttempts.filter((entry) => entry.fallbackCopy).map((entry) => entry.item);
         const directFailures = moveAttempts.filter((entry) => !entry.success && !entry.fallbackCopy);
         let copyResults = [];
         let copiedEntries = [];
 
-        // Copy cross-volume media and Windows media that Premiere has temporarily locked.
+        // Copy only cross-volume media; locked files never enter the copy fallback.
         if (fallbackItems.length > 0) {
-            // This fallback covers both cross-volume copies and files that Windows has temporarily locked.
+            // A cross-volume move necessarily copies data to the other volume.
             updateConsolidationProgressText('Copie sécurisée…');
             copyResults = await copyFiles(fallbackItems.map((item) => ({
                 name: item.name,
@@ -3050,7 +3127,7 @@ async function fm_syncStructureToDisk() {
             const relinkedNativeCount = relinkedEntries.filter((entry) => entry.mode === 'native').length;
             await fm_rollbackNativeStructureMoves(unrelinkedNativeEntries);
             nativeEntriesToRestore = [];
-            movedCount = relinkedNativeCount + removedCopiedCount;
+            movedCount = releasedCount + relinkedNativeCount + removedCopiedCount;
             retainedCount = relinkedCopiedItems.length - removedCopiedCount + unrelinkedCopiedCount;
             // A failed relink after a native move is restored, so it is a failure but not a retained duplicate.
             directFailures.push.apply(directFailures, unrelinkedNativeEntries);

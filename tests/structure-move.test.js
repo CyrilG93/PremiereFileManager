@@ -69,7 +69,7 @@ function hostReferences(currentPath, options = {}) {
     return { refs, context };
 }
 
-for (const scenario of ['success', 'locked', 'release fails', 'relink fails']) {
+for (const scenario of ['success', 'Windows only', 'locked', 'release fails', 'relink fails']) {
     test(`Offline move: ${scenario}, duplicate references and recovery`, async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-release-'));
         const currentPath = path.join(dir, 'source.mp4');
@@ -78,15 +78,26 @@ for (const scenario of ['success', 'locked', 'release fails', 'relink fails']) {
         const host = hostReferences(currentPath, { releaseFails: scenario === 'release fails', relinkFails: scenario === 'relink fails' });
         const h = helpers({ ...fs, renameSync(src, dst) {
             // The simulated Premiere lock disappears only after both references are offline.
-            if (scenario === 'locked' || host.refs.slice(0, 2).some((ref) => !ref.offline)) {
+            if (scenario === 'locked' || scenario === 'Windows only' || host.refs.slice(0, 2).some((ref) => !ref.offline)) {
                 throw Object.assign(new Error('busy'), { code: 'EBUSY' });
             }
             fs.renameSync(src, dst);
         } });
         h.fm_buildHostCall = (name, args) => ({ name, args });
         h.fm_evalScriptPromise = async ({ name, args }) => host.context[name](...args);
+        if (scenario === 'locked') {
+            h.fm_windowsStructureRename = async () => { throw Object.assign(new Error('Windows still busy'), { code: 'EBUSY' }); };
+        }
+        if (scenario === 'Windows only') {
+            // The Windows retry must run before recovery reconnects either reference.
+            h.fm_windowsStructureRename = async (src, dst) => {
+                assert.equal(host.refs[0].offline, true);
+                assert.equal(host.refs[1].offline, true);
+                fs.renameSync(src, dst);
+            };
+        }
         const result = await h.fm_moveReleasedStructureItem({ currentPath, targetPath, name: 'selected', nodeId: 'selected' });
-        const succeeded = scenario === 'success';
+        const succeeded = scenario === 'success' || scenario === 'Windows only';
         assert.equal(result.success, succeeded);
         assert.equal(result.fallbackCopy, undefined);
         assert.equal(fs.existsSync(currentPath), !succeeded);

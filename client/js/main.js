@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.19';
+let CURRENT_VERSION = '1.5.20';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2998,7 +2998,12 @@ async function fm_moveReleasedStructureItem(item) {
                 if (!['EBUSY', 'EPERM', 'EACCES'].includes(error.code)) { throw error; }
             }
         }
-        if (!moved) { throw lastError; }
+        if (!moved) {
+            // Retry the non-replacing Windows API while references are still offline, not only before release.
+            debugLog(`[Structure] Node still blocked after release (${lastError.code}); trying Windows move while offline`, 'info');
+            await fm_windowsStructureRename(item.currentPath, item.targetPath);
+            moved = true;
+        }
         await fm_structureHostRequest('FileManager_relinkStructureItems', references.map((ref) => ({ ...ref, targetPath: item.targetPath })));
         linked = true;
         debugLog(`[Structure] Released, moved without copy, and relinked: ${item.targetPath}`, 'info');

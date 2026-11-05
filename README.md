@@ -139,6 +139,12 @@ For issues, questions, or feature requests, please send me a message on Discord.
 
 ## Changelog
 
+### v1.5.21 - 2026-11-05
+- Structure sync now moves locked Windows media in batches without copying their data, then reconnects them automatically.
+- If a file cannot be moved, its media links are restored without undoing successful moves.
+- Added source-folder rules for importing media into chosen Premiere bins, including sub-bins.
+- Improved translated settings and analysis messages.
+
 ### v1.5.13 - 2026-09-16
 - Consolidate now relinks an existing destination copy when it matches the original file size, instead of leaving it skipped.
 - Added the Structure tab to compare Premiere bins with folders on disk and synchronize selected differences in either direction.

@@ -6,7 +6,7 @@ let currentMode = 'export'; // Track current mode: 'export' or 'import'
 
 const GITHUB_REPO = 'CyrilG93/PremiereFileManager';
 const PRODUCT_PAGE_URL = 'https://www.cyrilplugin.com/file-manager';
-let CURRENT_VERSION = '1.5.20';
+let CURRENT_VERSION = '1.5.21';
 const FM_THEME_COLOR_CHANGED_EVENT = 'com.adobe.csxs.events.ThemeColorChanged';
 
 function fm_clampThemeChannel(value) {
@@ -2925,7 +2925,7 @@ async function fm_renameStructureFile(sourcePath, destinationPath) {
 }
 
 // Move one file with a filesystem rename when source and destination share a volume.
-async function fm_tryNativeStructureMove(item) {
+async function fm_tryNativeStructureMove(item, deferWindowsRetry = false) {
     try {
         const sourcePath = fm_path.resolve(item.currentPath);
         const destinationPath = fm_path.resolve(item.targetPath);
@@ -2939,7 +2939,8 @@ async function fm_tryNativeStructureMove(item) {
             throw new Error('Destination already exists');
         }
         fm_fs.mkdirSync(fm_path.dirname(destinationPath), { recursive: true });
-        await fm_renameStructureFile(sourcePath, destinationPath);
+        if (deferWindowsRetry) { fm_fs.renameSync(sourcePath, destinationPath); }
+        else { await fm_renameStructureFile(sourcePath, destinationPath); }
         debugLog(`[Structure] Native move: ${sourcePath} -> ${destinationPath}`, 'info');
         return { item, success: true, mode: 'native' };
     } catch (error) {
@@ -2958,82 +2959,121 @@ async function fm_tryNativeStructureMove(item) {
 }
 
 // Verify host replies so a silent relink failure cannot be reported as a completed move.
-async function fm_structureHostRequest(name, items) {
+async function fm_structureHostRequest(name, items, allowPartial = false) {
     const result = JSON.parse(await fm_evalScriptPromise(fm_buildHostCall(name, [JSON.stringify(items)])));
     if (result.error) { throw new Error(result.error); }
     if (name === 'FileManager_relinkStructureItems' && (!Array.isArray(result.results) || result.results.length !== items.length)) {
         throw new Error('Incomplete media relink response');
     }
     if (name === 'FileManager_setStructureReferencesOffline' && result.success !== true) { throw new Error('Media release not confirmed'); }
-    if (result.results && result.results.some((entry) => !entry.success)) {
+    if (!allowPartial && result.results && result.results.some((entry) => !entry.success)) {
         throw new Error(result.results.filter((entry) => !entry.success).map((entry) => entry.error).join('; '));
     }
     return result;
 }
 
-// Detach all online references, allow a short handle-release delay, move, then reconnect the same items.
-async function fm_moveReleasedStructureItem(item) {
-    let references = [];
-    let moved = false;
-    let linked = false;
-    let failure = null;
-    try {
-        // Snapshot first: even a partially failed offline request can then be recovered.
-        const snapshot = await fm_structureHostRequest('FileManager_getStructureReferences', item);
-        references = Array.isArray(snapshot.references) ? snapshot.references : [];
-        if (!references.length) { throw new Error('Missing media references'); }
-        debugLog(`[Structure] Temporarily releasing ${references.length} Premiere reference(s)`, 'info');
-        await fm_structureHostRequest('FileManager_setStructureReferencesOffline', references);
-        let lastError;
-        for (const delay of [100, 200, 400, 800]) {
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            try {
-                // Recheck destination on every attempt; an unrelated file must never be replaced.
-                if (fm_fs.existsSync(item.targetPath)) { throw new Error('Destination already exists'); }
-                fm_fs.renameSync(item.currentPath, item.targetPath);
-                moved = true;
-                break;
-            } catch (error) {
-                lastError = error;
-                if (!['EBUSY', 'EPERM', 'EACCES'].includes(error.code)) { throw error; }
+// Release the whole locked batch before moving anything, and reconnect it after all move attempts.
+async function fm_moveReleasedStructureItems(items) {
+    const states = items.map((item) => ({ item, references: [], moved: false, linked: false, error: null }));
+    // Multiple destinations for one physical source cannot form a safe move batch.
+    const sources = new Map();
+    for (const state of states) {
+        const resolved = fm_path.resolve(state.item.currentPath);
+        const key = process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+        if (sources.has(key)) {
+            const error = new Error('Same source selected more than once; select a single destination');
+            sources.get(key).error = error;
+            state.error = error;
+        } else { sources.set(key, state); }
+    }
+    // Collect snapshots before mutation, so even a partial release can be recovered.
+    for (const state of states) {
+        if (state.error) { continue; }
+        try {
+            const snapshot = await fm_structureHostRequest('FileManager_getStructureReferences', state.item);
+            state.references = Array.isArray(snapshot.references) ? snapshot.references : [];
+            if (!state.references.length) { throw new Error('Missing media references'); }
+        } catch (error) { state.error = error; }
+    }
+    const prepared = states.filter((state) => !state.error);
+    const allReferences = prepared.reduce((refs, state) => refs.concat(state.references), []);
+    if (prepared.length) {
+        try {
+            debugLog(`[Structure] Batch release: ${prepared.length} file(s), ${allReferences.length} Premiere reference(s)`, 'info');
+            await fm_structureHostRequest('FileManager_setStructureReferencesOffline', allReferences);
+            // Each delay is shared by the whole batch; successful files are skipped in later rounds.
+            for (const delay of [100, 200, 400, 800]) {
+                if (!prepared.some((state) => !state.moved && !state.error)) { break; }
+                await new Promise((resolve) => setTimeout(resolve, delay));
+                for (const state of prepared.filter((entry) => !entry.moved && !entry.error)) {
+                    try {
+                        if (fm_fs.existsSync(state.item.targetPath)) { throw new Error('Destination already exists'); }
+                        fm_fs.renameSync(state.item.currentPath, state.item.targetPath);
+                        state.moved = true;
+                    } catch (error) {
+                        if (!['EBUSY', 'EPERM', 'EACCES'].includes(error.code)) { state.error = error; }
+                    }
+                }
             }
-        }
-        if (!moved) {
-            // Retry the non-replacing Windows API while references are still offline, not only before release.
-            debugLog(`[Structure] Node still blocked after release (${lastError.code}); trying Windows move while offline`, 'info');
-            await fm_windowsStructureRename(item.currentPath, item.targetPath);
-            moved = true;
-        }
-        await fm_structureHostRequest('FileManager_relinkStructureItems', references.map((ref) => ({ ...ref, targetPath: item.targetPath })));
-        linked = true;
-        debugLog(`[Structure] Released, moved without copy, and relinked: ${item.targetPath}`, 'info');
-        return { item, success: true, mode: 'released' };
-    } catch (error) {
-        failure = error;
-        // A partially successful relink can hold the destination open; release it again before rollback.
-        if (moved) {
-            try {
-                await fm_structureHostRequest('FileManager_setStructureReferencesOffline', references);
-                const rollback = await fm_rollbackNativeStructureMoves([{ item }]);
-                if (!rollback[0].success) { throw new Error(rollback[0].error); }
-                moved = false;
-            } catch (rollbackError) {
-                debugLog(`[Structure] File remains at ${item.targetPath}: ${rollbackError.message}`, 'error');
+            // Keep the proven Windows retry available while every batch reference is still offline.
+            for (const state of prepared.filter((entry) => !entry.moved && !entry.error)) {
+                try {
+                    debugLog(`[Structure] Trying Windows move while batch is offline: ${state.item.currentPath}`, 'info');
+                    await fm_windowsStructureRename(state.item.currentPath, state.item.targetPath);
+                    state.moved = true;
+                } catch (error) { state.error = error; }
             }
-        }
-    } finally {
-        if (!linked && references.length) {
-            const recoveryPath = moved ? item.targetPath : item.currentPath;
-            try {
-                await fm_structureHostRequest('FileManager_relinkStructureItems', references.map((ref) => ({ ...ref, targetPath: recoveryPath })));
-                debugLog(`[Structure] Media references restored: ${recoveryPath}`, 'info');
-            } catch (restoreError) {
-                debugLog(`[Structure] Manual relink required at ${recoveryPath}: ${restoreError.message}`, 'error');
+            const moved = prepared.filter((state) => state.moved);
+            const relinks = moved.reduce((refs, state) => refs.concat(state.references.map((ref) => ({ ...ref, targetPath: state.item.targetPath }))), []);
+            if (relinks.length) {
+                debugLog(`[Structure] Batch relink: ${moved.length} moved file(s)`, 'info');
+                const result = await fm_structureHostRequest('FileManager_relinkStructureItems', relinks, true);
+                let offset = 0;
+                for (const state of moved) {
+                    const replies = result.results.slice(offset, offset + state.references.length);
+                    offset += state.references.length;
+                    state.linked = replies.every((reply) => reply.success === true);
+                    if (!state.linked) { state.error = new Error(replies.filter((reply) => !reply.success).map((reply) => reply.error).join('; ')); }
+                }
+            }
+        } catch (error) {
+            for (const state of prepared.filter((entry) => !entry.linked)) { state.error = error; }
+        } finally {
+            const failedMoves = prepared.filter((state) => state.moved && !state.linked);
+            // Release only failed relinks for rollback; successful batch files remain linked.
+            if (failedMoves.length) {
+                try {
+                    await fm_structureHostRequest('FileManager_setStructureReferencesOffline', failedMoves.reduce((refs, state) => refs.concat(state.references), []));
+                    const rollback = await fm_rollbackNativeStructureMoves(failedMoves);
+                    failedMoves.forEach((state, index) => {
+                        if (rollback[index].success) { state.moved = false; }
+                        else { debugLog(`[Structure] File remains at ${state.item.targetPath}: ${rollback[index].error}`, 'error'); }
+                    });
+                } catch (error) { debugLog(`[Structure] Batch rollback incomplete: ${error.message}`, 'error'); }
+            }
+            // Reconnect both unmoved sources and any destinations whose rollback could not complete.
+            const recovery = prepared.filter((state) => !state.linked).reduce((refs, state) => refs.concat(state.references.map((ref) => ({ ...ref, targetPath: state.moved ? state.item.targetPath : state.item.currentPath }))), []);
+            if (recovery.length) {
+                try {
+                    const restored = await fm_structureHostRequest('FileManager_relinkStructureItems', recovery, true);
+                    restored.results.forEach((reply, index) => {
+                        debugLog(`[Structure] ${reply.success ? 'Media reference restored' : 'Manual relink required'}: ${recovery[index].targetPath}${reply.error ? ` (${reply.error})` : ''}`, reply.success ? 'info' : 'error');
+                    });
+                } catch (error) {
+                    for (const ref of recovery) { debugLog(`[Structure] Manual relink required at ${ref.targetPath}: ${error.message}`, 'error'); }
+                }
             }
         }
     }
-    debugLog(`[Structure] Move cancelled without copying: ${failure.message}`, 'warning');
-    return { item, success: false, error: failure.message };
+    return states.map((state) => {
+        if (state.linked) {
+            debugLog(`[Structure] Released, moved without copy, and relinked: ${state.item.targetPath}`, 'info');
+            return { item: state.item, success: true, mode: 'released' };
+        }
+        const message = state.error ? state.error.message : 'Move not completed';
+        debugLog(`[Structure] Move cancelled without copying: ${state.item.currentPath} (${message})`, 'warning');
+        return { item: state.item, success: false, error: message };
+    });
 }
 
 // Restore files moved natively when Premiere cannot relink them to their new location.
@@ -3082,8 +3122,14 @@ async function fm_syncStructureToDisk() {
         // Complete moves sequentially before relinking Premiere.
         const moveAttempts = [];
         for (const item of selectedItems) {
-            const attempt = await fm_tryNativeStructureMove(item);
-            moveAttempts.push(attempt.requiresRelease ? await fm_moveReleasedStructureItem(item) : attempt);
+            moveAttempts.push(await fm_tryNativeStructureMove(item, true));
+        }
+        // Defer expensive Windows retries until all locked media can be released together.
+        const lockedItems = moveAttempts.filter((entry) => entry.requiresRelease).map((entry) => entry.item);
+        const releasedResults = lockedItems.length ? await fm_moveReleasedStructureItems(lockedItems) : [];
+        let releasedIndex = 0;
+        for (let index = 0; index < moveAttempts.length; index++) {
+            if (moveAttempts[index].requiresRelease) { moveAttempts[index] = releasedResults[releasedIndex++]; }
         }
         const releasedCount = moveAttempts.filter((entry) => entry.success && entry.mode === 'released').length;
         movedCount = releasedCount;

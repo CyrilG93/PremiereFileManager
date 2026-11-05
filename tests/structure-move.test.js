@@ -96,7 +96,7 @@ for (const scenario of ['success', 'Windows only', 'locked', 'release fails', 'r
                 fs.renameSync(src, dst);
             };
         }
-        const result = await h.fm_moveReleasedStructureItem({ currentPath, targetPath, name: 'selected', nodeId: 'selected' });
+        const result = (await h.fm_moveReleasedStructureItems([{ currentPath, targetPath, name: 'selected', nodeId: 'selected' }]))[0];
         const succeeded = scenario === 'success' || scenario === 'Windows only';
         assert.equal(result.success, succeeded);
         assert.equal(result.fallbackCopy, undefined);
@@ -125,7 +125,7 @@ test('Missing reference snapshot cancels before taking any media offline', async
     h.fm_buildHostCall = (name) => name;
     const calls = [];
     h.fm_evalScriptPromise = async (name) => { calls.push(name); return '{}'; };
-    const result = await h.fm_moveReleasedStructureItem({ currentPath: 'source', targetPath: 'destination' });
+    const result = (await h.fm_moveReleasedStructureItems([{ currentPath: 'source', targetPath: 'destination' }]))[0];
     assert.equal(result.success, false);
     assert.deepEqual(calls, ['FileManager_getStructureReferences']);
 });
@@ -135,6 +135,86 @@ test('Host rejects a silent changeMediaPath failure', () => {
     refs[0].changeMediaPath = () => {};
     const result = JSON.parse(context.FileManager_relinkStructureItems(JSON.stringify([{ nodeId: 'selected', currentPath: 'source', targetPath: 'target' }])));
     assert.equal(result.results[0].success, false);
+});
+
+// Check batch ordering and isolation using real file moves and a host recording every phase.
+for (const scenario of ['success', 'one locked', 'one relink fails', 'partial release fails']) {
+    test(`Grouped offline move: ${scenario}`, async () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fm-batch-'));
+        const items = [0, 1].map((index) => ({ nodeId: String(index), name: String(index), currentPath: path.join(dir, `source${index}`), targetPath: path.join(dir, `target${index}`) }));
+        items.forEach((item) => fs.writeFileSync(item.currentPath, item.name));
+        const offline = [false, false];
+        const locations = items.map((item) => item.currentPath);
+        const events = [];
+        let waits = 0;
+        const h = helpers({ ...fs, renameSync(src, dst) {
+            const index = items.findIndex((item) => item.currentPath === src || item.targetPath === src);
+            events.push(`move${index}`);
+            if (src === items[index].currentPath) {
+                assert.deepEqual(offline, [true, true]);
+                if (scenario === 'one locked' && index === 1) { throw Object.assign(new Error('busy'), { code: 'EBUSY' }); }
+            }
+            fs.renameSync(src, dst);
+        } });
+        h.setTimeout = (callback) => { waits++; callback(); };
+        h.fm_windowsStructureRename = async () => { throw Object.assign(new Error('Windows busy'), { code: 'EBUSY' }); };
+        h.fm_buildHostCall = (name, args) => ({ name, args });
+        h.fm_evalScriptPromise = async ({ name, args }) => {
+            const value = JSON.parse(args[0]);
+            if (name === 'FileManager_getStructureReferences') {
+                events.push(`snapshot${value.nodeId}`);
+                return JSON.stringify({ references: [value] });
+            }
+            if (name === 'FileManager_setStructureReferencesOffline') {
+                events.push(`offline:${value.length}`);
+                for (const ref of value) {
+                    offline[Number(ref.nodeId)] = true;
+                    if (scenario === 'partial release fails') { return JSON.stringify({ error: 'Partial release failure' }); }
+                }
+                return '{"success":true}';
+            }
+            events.push(`relink:${value.length}`);
+            return JSON.stringify({ results: value.map((ref) => {
+                const index = Number(ref.nodeId);
+                if (scenario === 'one relink fails' && index === 1 && ref.targetPath === items[1].targetPath) { return { success: false, error: 'Relink refused' }; }
+                locations[index] = ref.targetPath;
+                offline[index] = false;
+                return { success: true };
+            }) });
+        };
+        const results = await h.fm_moveReleasedStructureItems(items);
+        const successful = scenario === 'partial release fails' ? [false, false] : [true, scenario === 'success'];
+        assert.deepEqual(Array.from(results, (result) => result.success), successful);
+        assert.deepEqual(events.slice(0, 3), ['snapshot0', 'snapshot1', 'offline:2']);
+        assert.deepEqual(offline, [false, false]);
+        if (scenario === 'success') {
+            assert.deepEqual(events, ['snapshot0', 'snapshot1', 'offline:2', 'move0', 'move1', 'relink:2']);
+            assert.equal(waits, 1);
+        }
+        if (scenario === 'one locked') { assert.equal(waits, 4); }
+        for (let index = 0; index < items.length; index++) {
+            const expectedPath = successful[index] ? items[index].targetPath : items[index].currentPath;
+            assert.equal(locations[index], expectedPath);
+            assert.equal(fs.readFileSync(expectedPath, 'utf8'), items[index].name);
+            assert.equal(fs.existsSync(successful[index] ? items[index].currentPath : items[index].targetPath), false);
+            fs.unlinkSync(expectedPath);
+        }
+        fs.rmdirSync(dir);
+    });
+}
+
+test('Initial batch pass defers Windows retries until media release', { skip: process.platform !== 'win32' }, async () => {
+    const h = helpers({ ...fs, existsSync: (p) => p.endsWith('source'), statSync: () => ({ isFile: () => true }), mkdirSync() {}, renameSync() { throw Object.assign(new Error('busy'), { code: 'EBUSY' }); } });
+    h.fm_windowsStructureRename = async () => { assert.fail('Windows retry must be deferred'); };
+    const result = await h.fm_tryNativeStructureMove({ currentPath: 'source', targetPath: 'destination' }, true);
+    assert.equal(result.requiresRelease, true);
+});
+
+test('Duplicate source selections cancel before releasing shared references', async () => {
+    const h = helpers();
+    h.fm_structureHostRequest = async () => { assert.fail('Duplicate sources must not be released'); };
+    const results = await h.fm_moveReleasedStructureItems([{ currentPath: 'source', targetPath: 'first' }, { currentPath: 'source', targetPath: 'second' }]);
+    assert.deepEqual(Array.from(results, (result) => result.success), [false, false]);
 });
 
 test('Windows API never overwrites an existing destination', { skip: process.platform !== 'win32' }, async () => {

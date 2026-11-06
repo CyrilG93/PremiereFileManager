@@ -139,13 +139,11 @@ For issues, questions, or feature requests, please send me a message on Discord.
 
 ## Changelog
 
-### v1.5.21 - 2026-11-05
+### v1.5.21 - 2026-11-05 (pré-release/Beta)
 - Structure sync now moves locked Windows media in batches without copying their data, then reconnects them automatically.
 - If a file cannot be moved, its media links are restored without undoing successful moves.
 - Added source-folder rules for importing media into chosen Premiere bins, including sub-bins.
 - Improved translated settings and analysis messages.
-
-### v1.5.13 - 2026-09-16
 - Consolidate now relinks an existing destination copy when it matches the original file size, instead of leaving it skipped.
 - Added the Structure tab to compare Premiere bins with folders on disk and synchronize selected differences in either direction.
 - Structure synchronization moves files instantly when both locations are on the same volume, while keeping a safe copy fallback for different volumes.
@@ -162,9 +160,6 @@ For issues, questions, or feature requests, please send me a message on Discord.
 - Improved camera-card imports, Windows NAS path handling, and installer debug-mode coverage.
 
 ### v1.3.2 - 2026-06-29
-- Renamed the SpellBook extension section to **File Manager**.
-
-### v1.3.1 - 2026-06-29
 - Added SpellBook support for compact-mode shortcuts and control surfaces.
 - Registered three commands: Toggle Auto Sync, Import, and Consolidate.
 
